@@ -275,3 +275,54 @@ and selects the second 4K bank for $D000-$DFFF.
 - Usually with 16k "Language Card"
 ** IIe
 - 80-column card
+
+* Keyboard
+| Key     | Alone | CTRL | SHIFT | BOTH |
+| space   | A0    |      | A0    |      |
+| , <     | AC    |      | BC    |      |
+| - =     | AD    |      | BD    |      |
+| . >     | AE    |      | BE    |      |
+| / ?     | AF    |      | BF    |      |
+| 0       | B0    |      | B0    |      |
+| 1 !     | B1    |      | A1    |      |
+| 2 "     | B2    |      | A2    |      |
+| 3 #     | B3    |      | A3    |      |
+| 4 $     | B4    |      | A4    |      |
+| 5 %     | B5    |      | A5    |      |
+| 6 &     | B6    |      | A6    |      |
+| 7 '     | B7    |      | A7    |      |
+| 8 (     | B8    |      | A8    |      |
+| 9 )     | B9    |      | A9    |      |
+| : *     | BA    |      | AA    |      |
+| ; +     | BB    |      | AB    |      |
+| A       | C1    |   81 |       |      |
+| B       | C2    |   82 |       |      |
+| C       | C3    |   83 |       |      |
+| D       | C4    |   84 |       |      |
+| E       | C5    |   85 |       |      |
+| F       | C6    |   86 |       |      |
+| G       | C7    |   87 |       |      |
+| H       | C8    |   88 |       |      |
+| l arrow | 88    |      |       |      |
+| I       | C9    |   89 |       |      |
+| J       | CA    |   8A |       |      |
+| K       | CB    |   8B |       |      |
+| L       | CC    |   8C |       |      |
+| M ]     | CD    |   8D | DD    |   9D |
+| RETURN  | 8D    |      |       |      |
+| N ^     | CE    |   8E | DE    |   9E |
+| O       | CF    |   8F |       |      |
+| P @     | D0    |   90 | C0    |   80 |
+| Q       | D1    |   91 |       |      |
+| R       | D2    |   92 |       |      |
+| S       | D3    |   93 |       |      |
+| T       | D4    |   94 |       |      |
+| U       | D5    |   95 |       |      |
+| r arrow | 95    |      |       |      |
+| V       | D6    |   96 |       |      |
+| W       | D7    |   97 |       |      |
+| X       | D8    |   98 |       |      |
+| Y       | D9    |   99 |       |      |
+| Z       | DA    |   9A |       |      |
+| ESC     | 9B    |   9B |       |      |
+
