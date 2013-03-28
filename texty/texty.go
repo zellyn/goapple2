@@ -3,23 +3,13 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"time"
 
 	"github.com/nsf/termbox-go"
-	"github.com/zellyn/go6502/asm"
-	"github.com/zellyn/go6502/cpu"
+	"github.com/zellyn/goapple2"
+	"github.com/zellyn/goapple2/util"
+	"github.com/zellyn/goapple2/videoscan"
 )
-
-// Memory for the tests. Satisfies the cpu.Memory interface.
-type Apple2 struct {
-	mem    [65536]byte
-	events chan termbox.Event
-	done   bool
-	key    byte // BUG(zellyn): make reads/writes atomic
-	keys   chan byte
-	debug  bool // Set true and close termbox to start tracing out instructions
-}
 
 // Mapping of screen bytes to character values
 var AppleChars = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ !\"#$%&'()*+,-./0123456789:;<=>?"
@@ -55,136 +45,76 @@ func termboxToAppleKeyboard(ev termbox.Event) (key byte, err error) {
 	return 0, fmt.Errorf("hi")
 }
 
-func (a2 *Apple2) Read(address uint16) byte {
-	// Keyboard read
-	if address == 0xC000 {
-		return a2.key
-	}
-	if address == 0xC010 {
-		a2.key &= 0x7F
-		return 0 // BUG(zellyn): return proper value (keydown on IIe, not sure on II+)
-	}
-	return a2.mem[address]
-}
+// func Write(address uint16, value byte) {
+// 	a2.mem[address] = value
+// 	if address >= 0x0400 && address < 0x0800 {
+// 		offset := int(address - 0x0400)
+// 		count := offset & 0x7f
+// 		if count <= 119 {
+// 			x := count % 40
+// 			segment := offset / 128
+// 			which40 := count / 40
+// 			y := which40*8 + segment
+// 			ch, fg, bg := translateToTermbox(value)
+// 			termbox.SetCell(x+1, y+1, ch, fg, bg)
+// 			termbox.Flush()
+// 		}
+// 	}
+// }
 
-func (a2 *Apple2) Write(address uint16, value byte) {
-	if address >= 0xD000 {
-		termbox.Close()
-		panic(fmt.Sprintln("Write to ROM at address $%04X", address))
-	}
-	if address == 0xC010 {
-		// Clear keyboard strobe
-		a2.key &= 0x7F
-	}
-	a2.mem[address] = value
-	if !a2.debug && address >= 0x0400 && address < 0x0800 {
-		offset := int(address - 0x0400)
-		count := offset & 0x7f
-		if count <= 119 {
-			x := count % 40
-			segment := offset / 128
-			which40 := count / 40
-			y := which40*8 + segment
-			ch, fg, bg := translateToTermbox(value)
-			termbox.SetCell(x+1, y+1, ch, fg, bg)
-			termbox.Flush()
-		}
-	}
-}
-
-func (a2 *Apple2) Init() error {
-	if err := termbox.Init(); err != nil {
-		return err
-	}
-	a2.events = make(chan termbox.Event)
-	a2.keys = make(chan byte, 16)
-	go func() {
-		for {
-			a2.events <- termbox.PollEvent()
-		}
-	}()
-	return nil
-}
-func (a2 *Apple2) Close() {
-	termbox.Close()
-}
-
-func (a2 *Apple2) ProcessEvents() {
+func ProcessEvents(events chan termbox.Event, a2 *goapple2.Apple2) bool {
 	select {
-	case ev := <-a2.events:
+	case ev := <-events:
 		if ev.Type == termbox.EventKey && ev.Ch == '~' {
-			a2.done = true
+			return true
 		}
 		if ev.Type == termbox.EventKey {
 			if key, err := termboxToAppleKeyboard(ev); err == nil {
-				a2.keys <- key | 0x80
+				a2.Keypress(key | 0x80)
 			}
 		}
 	default:
 	}
 
-	if a2.key&0x80 == 0 {
-		select {
-		case key := <-a2.keys:
-			a2.key = key
-		default:
-		}
+	return false
+}
+
+type TextPlotter int
+
+func (p TextPlotter) Plot(data videoscan.PlotData) {
+	y := int(data.Row / 8)
+	x := int(data.Column)
+	value := data.RawData
+	ch, fg, bg := translateToTermbox(value)
+	termbox.SetCell(x+1, y+1, ch, fg, bg)
+	if x == 39 && data.Row == 191 {
+		termbox.Flush()
 	}
-}
-
-// Cycle counter for the tests. Satisfies the cpu.Ticker interface.
-type CycleCount uint64
-
-func (c *CycleCount) Tick() {
-	*c += 1
-}
-
-// printStatus prints out the current CPU instruction and register status.
-func printStatus(c cpu.Cpu, m *[65536]byte) {
-	bytes, text, _ := asm.Disasm(c.PC(), m[c.PC()], m[c.PC()+1], m[c.PC()+2])
-	fmt.Printf("$%04X: %s  %s  A=$%02X X=$%02X Y=$%02X SP=$%02X P=$%08b\n",
-		c.PC(), bytes, text, c.A(), c.X(), c.Y(), c.SP(), c.P())
 }
 
 // Run the emulator
 func RunEmulator() {
-	bytes, err := ioutil.ReadFile("../data/roms/apple2+.rom")
-	if err != nil {
-		panic("Cannot read ROM file")
+	rom := util.ReadRomOrDie("../data/roms/apple2+.rom")
+	plotter := TextPlotter(0)
+	a2 := goapple2.NewApple2(plotter, rom)
+	if err := termbox.Init(); err != nil {
+		panic(err)
 	}
-	var a2 Apple2
-	ROM_OFFSET := 0xD000
-	copy(a2.mem[ROM_OFFSET:ROM_OFFSET+len(bytes)], bytes)
-	a2.Init()
-	var cc CycleCount
-	c := cpu.NewCPU(&a2, &cc, cpu.VERSION_6502)
-	c.Reset()
-	for !a2.done {
-		// // LIST
-		// if c.PC() == 0xD6A5 {
-		// 	termbox.Close()
-		// 	a2.debug = true
-		// }
-		// // End of LIST
-		// if c.PC() == 0xD729 {
-		// 	break
-		// }
-		if !a2.debug {
-			a2.ProcessEvents()
+	events := make(chan termbox.Event)
+	go func() {
+		for {
+			events <- termbox.PollEvent()
 		}
-		if a2.debug {
-			printStatus(c, &a2.mem)
-		}
-		err := c.Step()
+	}()
+	for !ProcessEvents(events, a2) {
+		err := a2.Step()
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
 		time.Sleep(1 * time.Nanosecond) // So the keyboard-reading goroutines can run
 	}
-	if !a2.debug {
-		a2.Close()
-	}
+	termbox.Close()
 }
 
 func main() {

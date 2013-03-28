@@ -217,6 +217,7 @@ Apple II notes
 - http://www.textfiles.com/apple/peeks.pokes.2
 - http://www.applefritter.com/node/24236
 - http://www.easy68k.com/paulrsm/6502/index.html - Information about firmware
+- http://www-personal.umich.edu/~mressl/a2dp/index.html - Apple II documentation project
 
 * Language card
 Install in slot 0.
@@ -325,4 +326,145 @@ and selects the second 4K bank for $D000-$DFFF.
 | Y       | D9    |   99 |       |      |
 | Z       | DA    |   9A |       |      |
 | ESC     | 9B    |   9B |       |      |
+
+
+* Character set
+@ABCDEFGHIJKLMNO
+PQRSTUVWXYZ[\]^_
+ !"#$%&'()*+,-./
+0123456789:;<=>?
+
+64 * 8 = 512
+Revision 7: 256 * 8 = 2048
+
+* Video scanning
+H0,H1,H2,H3,H4,H5,HPE'
+VA,VB,VC,V0,V1,V2,V3,V4,V5
+
+** Horizontal scanning: H0-H5,HPE'
+7 bits, 65 states. 0000000,1000000-1111111. HPE' is low only for one cycle, the long cycle.
+40/65 states send picture output. 25/65 are blanked.
+
+** Vertical scanning: VA-VC,V0-V5
+Increments on overflow from the horizontal section.
+9 bits, 262 states. 011111010-111111111.
+192/262 states send picture information, 70/262 are blanked.
+V4V3 divides the screen into thirds:
+- V4'V3' - Top third
+- V4'V3  - Middle third
+- V4 V3' - Bottom third
+- V4 V3  - Undisplayed (VBL)
+6 cycles blanked:  011111010-011111111
+64 cycles blanked: 111000000-111111111
+
+| Location on TV screen | Least significant address bits |
+|-----------------------+--------------------------------|
+| Top                   | 0000000 - 0100111 (First 40)   |
+| Middle                | 0101000 - 1001111 (Second 40)  |
+| Bottom                | 1010000 - 1110111 (Third 40)   | 
+
+Lowest 3 bits are easy: H2,H1,H0 == A2,A1,A0 
+Next four bits are H5-H4-H3 + offset = SUM-A{3..6}
+- 0000-0100, 0101-1001, 1010-1110.
+H5-H4-H3: 000..010 are undisplayed: right margin, retrace, left margin. 011 first displayed.
+H543 -3 in First 40, +2 in second 40, +7 in Third 40.
+
+     1      1      0      1
++          H5     H4     H3
++   V4     V3     V4     V3
+---------------------------
+SUM-A6 SUM-A5 SUM-A4 SUM-A3
+
+** Pages:
+$0000-$3FFF - ! HIRES PAGE 2
+$4000-$7FFF - HIRES PAGE 2
+
+HIRES TIME:
+- high when in HIRES, GRAPHICS, NO MIX mode
+- high when in HIRES, GRAPHICS, MIX, !(V4•V2)  (·)
+
+
+
+| A0  | H0                          |
+| A1  | H1                          |
+| A2  | H2                          |
+| A3  | SUM-A3                      |
+| A4  | SUM-A4                      |
+| A5  | SUM-A5                      |
+| A6  | SUM-A6                      |
+| A7  | V0                          |
+| A8  | V1                          |
+| A9  | V2                          |
+| A10 | HIRES•VA + TEXT/LORES•PAGE1 |
+| A11 | HIRES•VB + TEXT/LORES•PAGE2 |
+| A12 | HIRES•VC + TEXT/LORES•HBL   |
+| A13 | HIRES•PAGE1                 |
+| A14 | HIRES•PAGE2                 |
+| A15 | -                           |
+
+VA,VB,VC determine which part of text characters to draw.
+VC determines which of two LORES blocks to draw.
+
+
+
+* Colors
+
+| Color Ref        | 0011 |
+| Dark Magenta     | 0001 |
+| Light Magenta    | 1011 |
+| HIRES Violet     | 0011 |
+| Dark Blue        | 0010 |
+| Light Blue       | 0111 |
+| HIRES Blue       | 0110 |
+| Dark Blue-Green  | 0100 |
+| Light Blue-Green | 1110 |
+| HIRES Green      | 1100 |
+| Dark Brown       | 1000 |
+| Light Brown      | 1101 |
+| HIRES Orange     | 1001 |
+| $5 Grey          | 0101 |
+| $A Grey          | 1010 |
+| White            | 1111 |
+| Black            | 0000 | 
+
+* Design
+
+Event loop runs everything.
+Key/mouse/resize/quit events come from somewhere (sdl)
+Key events go to CPU.
+Event loop can pause emulator and bring up menu.
+- change disks
+- save state, etc.
+- change parameters
+Video scanner scanning memory -> chroma/luma signal -> color interpreter -> plotting
+Event loop hands colorplotter a pixelplotter
+colorplotter does green / b/w / color choice
+Some kind of menu subsystem for paused/config mode.
+
+
+* Gospeccy design
+
+spectrum.Application
+- HasTerminated chan
+- RequestExit()
+spectrum.Spectrum48k (app, *rom)
+- EmulatorLoop()
+- CommandChannel
+- speccy.Keyboard.Key{Down,Up}
+
+sdl_output.Main():
+- Get a spectrum.Application
+- Get a spectrum.Spectrum48k
+- r = NewSDLRenderer(app, speccy, ...)
+- setUI(r)
+- initCLI()
+- go sdlEventLoop(app, speccy)
+- wait for shutdown
+- sdl.Quit()
+
+sdlEventLoop():
+- evtLoop = app.NewEventLoop()
+
+  
+
 
