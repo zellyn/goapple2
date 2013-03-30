@@ -45,23 +45,6 @@ func termboxToAppleKeyboard(ev termbox.Event) (key byte, err error) {
 	return 0, fmt.Errorf("hi")
 }
 
-// func Write(address uint16, value byte) {
-// 	a2.mem[address] = value
-// 	if address >= 0x0400 && address < 0x0800 {
-// 		offset := int(address - 0x0400)
-// 		count := offset & 0x7f
-// 		if count <= 119 {
-// 			x := count % 40
-// 			segment := offset / 128
-// 			which40 := count / 40
-// 			y := which40*8 + segment
-// 			ch, fg, bg := translateToTermbox(value)
-// 			termbox.SetCell(x+1, y+1, ch, fg, bg)
-// 			termbox.Flush()
-// 		}
-// 	}
-// }
-
 func ProcessEvents(events chan termbox.Event, a2 *goapple2.Apple2) bool {
 	select {
 	case ev := <-events:
@@ -70,7 +53,7 @@ func ProcessEvents(events chan termbox.Event, a2 *goapple2.Apple2) bool {
 		}
 		if ev.Type == termbox.EventKey {
 			if key, err := termboxToAppleKeyboard(ev); err == nil {
-				a2.Keypress(key | 0x80)
+				a2.Keypress(key)
 			}
 		}
 	default:
@@ -96,7 +79,8 @@ func (p TextPlotter) Plot(data videoscan.PlotData) {
 func RunEmulator() {
 	rom := util.ReadRomOrDie("../data/roms/apple2+.rom")
 	plotter := TextPlotter(0)
-	a2 := goapple2.NewApple2(plotter, rom)
+	var charRom [2048]byte
+	a2 := goapple2.NewApple2(plotter, rom, charRom)
 	if err := termbox.Init(); err != nil {
 		panic(err)
 	}

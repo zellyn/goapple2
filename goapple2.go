@@ -13,24 +13,39 @@ type Apple2 struct {
 	keys    chan byte
 	plotter videoscan.Plotter
 	scanner *videoscan.Scanner
+	done    bool
+	tw      TickWaiter
 }
 
 // Cycle counter. Satisfies the cpu.Ticker interface.
-type CycleCount uint64
-
-func (c *CycleCount) Tick() {
-	*c += 1
+type TickWaiter struct {
+	Wait chan byte
 }
 
-func NewApple2(p videoscan.Plotter, rom []byte) *Apple2 {
-	var cc CycleCount
+func (t TickWaiter) Tick() {
+	<-t.Wait
+}
+
+func NewTickWaiter() TickWaiter {
+	return TickWaiter{Wait: make(chan byte)}
+}
+
+func NewApple2(p videoscan.Plotter, rom []byte, charRom [2048]byte) *Apple2 {
+	tw := NewTickWaiter()
 	a2 := Apple2{
 		keys: make(chan byte, 16),
+		tw:   tw,
 	}
 	copy(a2.mem[len(a2.mem)-len(rom):len(a2.mem)], rom)
-	a2.scanner = videoscan.NewScanner(&a2, p, [2048]byte{})
-	a2.cpu = cpu.NewCPU(&a2, &cc, cpu.VERSION_6502)
+	a2.scanner = videoscan.NewScanner(&a2, p, charRom)
+	a2.cpu = cpu.NewCPU(&a2, tw, cpu.VERSION_6502)
 	a2.cpu.Reset()
+	go func() {
+		tw.Tick()
+		for !a2.done {
+			a2.cpu.Step()
+		}
+	}()
 	return &a2
 }
 
@@ -65,13 +80,15 @@ func (a2 *Apple2) Write(address uint16, value byte) {
 }
 
 func (a2 *Apple2) Keypress(key byte) {
-	a2.keys <- key
+	a2.keys <- key | 0x80
 }
 
 func (a2 *Apple2) Step() error {
-	if err := a2.cpu.Step(); err != nil {
-		return err
-	}
+	a2.tw.Wait <- 0
 	a2.scanner.Scan1()
 	return nil
+}
+
+func (a2 *Apple2) Quit() {
+	a2.done = true
 }
