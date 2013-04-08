@@ -70,16 +70,16 @@ func (p TextPlotter) Plot(data videoscan.PlotData) {
 	value := data.RawData
 	ch, fg, bg := translateToTermbox(value)
 	termbox.SetCell(x+1, y+1, ch, fg, bg)
-	if x == 39 && data.Row == 191 {
-		termbox.Flush()
-	}
+}
+func (p TextPlotter) OncePerFrame() {
+	termbox.Flush()
 }
 
 // Run the emulator
 func RunEmulator() {
 	rom := util.ReadRomOrDie("../data/roms/apple2+.rom")
+	charRom := util.ReadSmallCharacterRomOrDie("../data/roms/apple2-chars.rom")
 	plotter := TextPlotter(0)
-	var charRom [2048]byte
 	a2 := goapple2.NewApple2(plotter, rom, charRom)
 	if err := termbox.Init(); err != nil {
 		panic(err)

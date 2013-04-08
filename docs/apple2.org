@@ -468,3 +468,20 @@ sdlEventLoop():
   
 
 
+
+* Firmware card
+$D000-$FFFF
+B2-B set (motherboard ROM)
+- RESET+switch down
+- odd addresses between $C081 and $C08F (slot 0)
+B2-B reset (firmware card ROM)
+- RESET+switch up
+- even addresses between $C080 and $C08E
+
+F8 jumper jumpered: use F8 ROM on card when card is enabled.
+F8 jumper not jumpered: never use F8 ROM on card: use motherboard.
+(Apple sold jumpered+autostart ROM, non-jumpered+no-rom. [UtA2: 6-11])
+
+* Questions
+** Color
+Can a previously rendered dot change colors? Gray?

@@ -1,1 +1,1 @@
-SDL_VIDEODRIVER=x11 go run sdl.go
+SDL_VIDEODRIVER=x11 go run sdl.go $@

@@ -27,3 +27,13 @@ func ReadSmallCharacterRomOrDie(filename string) [2048]byte {
 	}
 	return value
 }
+
+func ReadFullCharacterRomOrDie(filename string) [2048]byte {
+	bytes := ReadRomOrDie(filename)
+	if len(bytes) != 2048 {
+		panic(fmt.Sprintf("Got %d bytes (not 2048) from file '%s'", len(bytes), filename))
+	}
+	var value [2048]byte
+	copy(value[:], bytes)
+	return value
+}

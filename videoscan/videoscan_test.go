@@ -2,19 +2,25 @@ package videoscan
 
 import (
 	"testing"
-
-	"github.com/zellyn/go6502/tests"
-	apple2 "github.com/zellyn/goapple2"
 )
 
 type fakePlotter struct {
 }
 
-func (f *fakePlotter) Plot(apple2.PlotData) {
+func (f *fakePlotter) Plot(PlotData) {
+}
+func (f *fakePlotter) OncePerFrame() {
+}
+
+// Memory for the tests. Satisfies the videoscan.RamReader interfaces.
+type K64 [65536]byte
+
+func (m *K64) RamRead(address uint16) byte {
+	return m[address]
 }
 
 func TestHorizontal(t *testing.T) {
-	var m tests.Memorizer
+	var m K64
 	var f fakePlotter
 	s := NewScanner(&m, &f, [2048]byte{})
 
@@ -36,7 +42,7 @@ func TestHorizontal(t *testing.T) {
 }
 
 func TestVertical(t *testing.T) {
-	var m tests.Memorizer
+	var m K64
 	var f fakePlotter
 	s := NewScanner(&m, &f, [2048]byte{})
 	scan65 := func() {
@@ -63,7 +69,7 @@ func TestVertical(t *testing.T) {
 }
 
 func TestBlanking(t *testing.T) {
-	var m tests.Memorizer
+	var m K64
 	var f fakePlotter
 	s := NewScanner(&m, &f, [2048]byte{})
 
@@ -92,7 +98,7 @@ func TestBlanking(t *testing.T) {
 }
 
 func TestSpecificLocationAddresses(t *testing.T) {
-	var m tests.Memorizer
+	var m K64
 	var f fakePlotter
 	s := NewScanner(&m, &f, [2048]byte{})
 
