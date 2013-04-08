@@ -22,8 +22,8 @@ func ReadSmallCharacterRomOrDie(filename string) [2048]byte {
 	for i, b := range bytes {
 		value[i] = (b ^ 0xff) & 0x7f
 		value[i+512] = b | 0x80
-		value[i+1024] = b & 0x7f
-		value[i+1536] = b & 0x7f
+		value[i+1024] = b
+		value[i+1536] = b | 0x80
 	}
 	return value
 }
