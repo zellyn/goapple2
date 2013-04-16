@@ -13,6 +13,7 @@ import (
 	"github.com/0xe2-0x9a-0x9b/Go-SDL/sdl"
 	"github.com/zellyn/goapple2"
 	"github.com/zellyn/goapple2/cards"
+	"github.com/zellyn/goapple2/disk"
 	"github.com/zellyn/goapple2/util"
 	"github.com/zellyn/goapple2/videoscan"
 )
@@ -33,12 +34,10 @@ const (
 func plot(x, y uint, color uint32, screen *sdl.Surface) {
 	x = x + BORDER_W
 	y = y + BORDER_H
-	screen.Lock()
 	pixels := uintptr(screen.Pixels)
 	offset := uintptr(y*uint(screen.Pitch) + x*(SCREEN_BPP/8))
 	addr := pixels + offset
 	*(*uint32)(unsafe.Pointer(addr)) = color
-	screen.Unlock()
 }
 
 func Init() (screen *sdl.Surface, err error) {
@@ -255,7 +254,9 @@ func (s SdlPlotter) Plot(pd videoscan.PlotData) {
 }
 
 func (s SdlPlotter) OncePerFrame() {
+	s.screen.Unlock()
 	s.screen.Flip()
+	s.screen.Lock()
 	s.oncePerFrame()
 }
 
@@ -304,6 +305,21 @@ func RunEmulator() {
 	if err := a2.AddCard(firmwareCard); err != nil {
 		log.Fatal(err)
 	}
+
+	diskCardRom := util.ReadRomOrDie("../data/roms/Apple Disk II 16 Sector Interface Card ROM P5 - 341-0027.bin")
+	diskCard, err := cards.NewDiskCard(diskCardRom, 6, a2)
+	if err != nil {
+		panic(err)
+	}
+	if err := a2.AddCard(diskCard); err != nil {
+		log.Fatal(err)
+	}
+	disk1 := disk.NewNybble()
+	if err = disk1.LoadDosDisk("../data/disks/chivalry.dsk"); err != nil {
+		log.Fatal(err)
+	}
+	disk1.SetHalfTrack(50)
+	diskCard.LoadDisk(disk1, 0)
 
 	steps := *steplimit
 

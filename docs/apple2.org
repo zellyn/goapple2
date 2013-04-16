@@ -485,3 +485,183 @@ F8 jumper not jumpered: never use F8 ROM on card: use motherboard.
 * Questions
 ** Color
 Can a previously rendered dot change colors? Gray?
+** Disk
+I thought ProDOS only allowed a read syncing leader from $10 to
+$1A. But the nybblized disk format seems to have 48 spare bytes for
+each sector.
+(- 416 14 5 6 1 342) 48
+
+* Disk formats
+** dsk/do - DOS 3.3 order
+35 tracks * 16 sectors * 256 bytes = 143,360
+** po - ProDOS order
+** nib
+232,960 bytes
+
+(* 35 16 342)
+191,520
+
+(* 35 16 (+ 342 74))
+232,960 bytes
+
+Extra bytes per track:
+1184  (74 PER SECTOR)
+
+
+https://code.google.com/p/twoapple/source/browse/src/peripheral/diskii.d
+
+ADDR: 13
+ PROLOGUE: 3  D5,AA,96
+ VOLUME: 2
+ TRACK: 2
+ SECTOR: 2
+ CHECK: 2
+ EPILOGUE: 2  DE,AA
+
+DATAFIELD: 349
+  PROLOGUE: 3  D5,AA,AD
+  DATA: 343
+  EPILOGUE: 3  DE,AA,EB
+
+SECTOR:
+  ADDR: 13
+  GAP2: 6
+  DATAFIELD: 349
+  GAP3: 45
+
+(+ 13 6 349 45)
+413
+
+# 48 byte gap, 413 per sector: (+ 48 (* 16 413)) 6656
+
+
+http://sourceforge.net/p/java-ace/code/285/tree/jace/src/jace/hardware/FloppyDisk.java
+- 15 junk bytes
+- Address block: 14
+  - D5,AA,96 - 3
+  - Volume   - 2
+  - Track    - 2
+  - Sector   - 2
+  - Checksum - 2
+  - DE,AA,EB - 3
+- 4 junk bytes
+- Data block 349
+  - D5,AA,AD   3
+  - Data:    342
+  - Checksum:  1
+  - DE,AA,EB - 3
+- 34 junk bytes
+
+(+ 15 14 4 349 34)
+416
+
+
+Writing out:
+http://sourceforge.net/p/java-ace/code/285/tree/jace/src/jace/hardware/FloppyDisk.java#l260
+
+- Look for D5,AA,96
+- Verify track
+- Read sector
+- Look for DE,AA
+- Look for D5,AA,AD
+- 
+- Look for DE,AA,EB
+
+http://mrob.com/apple2/extract.txt
+
+https://code.google.com/p/openemulator/source/browse/trunk/libdiskimage/DIApple525DiskStorage.cpp#590
+- 128 sync bytes for track 0, 20 for others.
+- address field
+  - (+ 3 8 3) 14
+- 8 sync bytes
+- data field
+  - (+ 3 86 256 1 3) 349
+
+(+ 108 (* 20 16) (* 16 (+ 14 8 349)))
+6364
+
+6656
+
+
+* Listings
+* RWTS listing
+http://www.txbobsc.com/aal/1981/aal8109.html#a5
+
+* DOS 3.3 boot sector
+http://www.txbobsc.com/aal/1981/aal8108.html#a9
+
+* Volume numbers
+DOS 3.3: Default = 254
+Prodos: not used. [[https://groups.google.com/d/msg/comp.sys.apple2/YjoOR7gza1w/-2-HcNLLucwJ][1?]]
+
+* Sector orders
+
+** DOS 3.3
+[[ftp://ftp.apple.asimov.net/pub/apple_II/documentation/source_code/Apple2DOS33CSourceListing.pdf][Logical to physical sector mapping source]]
+
+Logical to physical
+0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F
+0,D,B,9,7,5,3,1,E,C,A,8,6,4,2,F
+
+Physical to logical:
+0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F
+0,7,E,6,D,5,C,4,B,3,A,2,9,1,8,F
+
+When writing nybblized track 1, we write track 1 in address header, but read from image track sector 7.
+
+logical 4 <==> physical 7
+
+** Prodos
+[[http://sourceforge.net/p/java-ace/code/285/tree/jace/src/jace/hardware/FloppyDisk.java#l40][Physical to logical - JACE]]
+
+Logical to Physical:
+0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F
+0,2,4,6,8,A,C,E,1,3,5,7,9,B,D,F
+
+Physical to logical:
+0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F
+0,8,1,9,2,A,3,B,4,C,5,D,6,E,7,F
+
+* Formatting...
+_Prodos note_: tolerance of read syncing leader is $10 to $1A, so drive
+speed must be close to 300rpm.
+
+Syncing leader: 5-40 FFs
+Address
+Gap 50
+Gap 53
+Syncing leader: 5 FFs
+
+
+Guess 40 FFs.
+Write 128 FF40's before Sector 0, 40 FF40s before the others.
+Write sectors in order (physical sectors).
+
+Sync count reduced by 2s until it reaches 16, then by ones until it reaches 5.
+If track 0 has >15 sync count, the rest of the tracks will have (sync count - 2).
+
+
+
+
+
+
+* Byte counts
+
+|             |                   Jace |            Twoapple |    OpenEmulator-Byte | OpenEmulator-Cycle          |
+|-------------+------------------------+---------------------+----------------------+-----------------------------|
+| Pre-track-0 |                        |                  48 |                  108 | (* 108 40) 4320             |
+| Pre-sync    |                     15 |                     |                   20 | (+ (* 19 40) 32) 792        |
+| Address     |                     14 |                  13 |                   14 | (+ (* 13 32) 16) 432        |
+| Intra-sync  |                      4 |                   6 |                    8 | (+ (* 7 40) 36) 316         |
+| Data        |                    349 |                 349 | (+ 3 86 256 3 1) 349 | (* 349 32) 11168            |
+| Post-sync   |                     34 |                  45 |                    0 | 0                           |
+|             | (+ 15 14 4 349 34) 416 | (+ 13 6 349 45) 413 |  (+ 20 14 8 349) 391 | (+ 792 432 316 11168) 12708 |
+|             |        (* 416 16) 6656 |     (* 413 16) 6608 |      (* 16 391) 6256 | (* 16 12708) 203328         |
+|             |                   6656 |    (+ 6608 48) 6656 |    (+ 6256 108) 6364 | (+ 203328 4320) 207648      |
+|             |                        |                     |                      | (/ 207648 4) 51912          |
+
+
+
+tracksize 51024
+(/ 51024 8)
+6378

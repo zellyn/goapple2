@@ -56,39 +56,41 @@ func (a2 *Apple2) handleCardRom(address uint16, value byte, write bool) byte {
 }
 
 func (a2 *Apple2) handleC00X(address uint16, value byte, write bool) byte {
-	switch address & 0xC0F0 {
-	// $C00X: Read keyboard
-	case 0xC000:
-		if a2.key&0x80 == 0 {
-			select {
-			case key := <-a2.keys:
-				a2.key = key
-			default:
+	if address < 0xC080 {
+		switch address & 0xC0F0 {
+		// $C00X: Read keyboard
+		case 0xC000:
+			if a2.key&0x80 == 0 {
+				select {
+				case key := <-a2.keys:
+					a2.key = key
+				default:
+				}
 			}
+			return a2.key
+		// $C01X: Reset keyboard
+		case 0xC010:
+			a2.key &= 0x7F
+			return a2.EmptyRead()
 		}
-		return a2.key
-	// $C01X: Reset keyboard
-	case 0xC010:
-		a2.key &= 0x7F
-		return a2.EmptyRead()
-	}
-	switch address {
-	case 0xC050: // GRAPHICS
-		a2.scanner.SetGraphics(true)
-	case 0xC051: // TEXT
-		a2.scanner.SetGraphics(false)
-	case 0xC052: // NOMIX
-		a2.scanner.SetMix(false)
-	case 0xC053: // MIX
-		a2.scanner.SetMix(true)
-	case 0xC054: // PAGE 1
-		a2.scanner.SetPage(1)
-	case 0xC055: // PAGE 2
-		a2.scanner.SetPage(2)
-	case 0xC056: // LORES
-		a2.scanner.SetHires(false)
-	case 0xC057: // HIRES
-		a2.scanner.SetHires(true)
+		switch address {
+		case 0xC050: // GRAPHICS
+			a2.scanner.SetGraphics(true)
+		case 0xC051: // TEXT
+			a2.scanner.SetGraphics(false)
+		case 0xC052: // NOMIX
+			a2.scanner.SetMix(false)
+		case 0xC053: // MIX
+			a2.scanner.SetMix(true)
+		case 0xC054: // PAGE 1
+			a2.scanner.SetPage(1)
+		case 0xC055: // PAGE 2
+			a2.scanner.SetPage(2)
+		case 0xC056: // LORES
+			a2.scanner.SetHires(false)
+		case 0xC057: // HIRES
+			a2.scanner.SetHires(true)
+		}
 	}
 
 	if address < 0xC080 {
