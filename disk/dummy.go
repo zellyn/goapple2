@@ -3,7 +3,11 @@ package disk
 type Dummy byte
 
 func (v Dummy) Read() byte {
-	return 0xFF
+	return 0x00
+}
+
+func (v Dummy) Skip(int) {
+	// pass
 }
 
 func (v Dummy) Write(b byte) {

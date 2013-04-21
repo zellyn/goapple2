@@ -228,3 +228,43 @@ func TestSpecificLocationAddresses(t *testing.T) {
 		}
 	}
 }
+
+func TestHiresConversion(t *testing.T) {
+	var m K64
+	var f fakePlotter
+	s := NewScanner(&m, &f, [2048]byte{})
+
+	s.SetMix(false)
+	s.SetGraphics(true)
+	s.SetHires(true)
+
+	hiresIn0 := []byte{0x03, 0x06, 0x0C, 0x18, 0x30}
+	hiresOut0 := []uint16{0xf, 0x3c, 0xf0, 0x3c0, 0xf00}
+	hiresIn1 := []byte{0x83, 0x86, 0x8C, 0x98, 0xB0}
+	hiresOut1 := []uint16{0x1e, 0x78, 0x1e0, 0x780, 0x1e00}
+	for i := range hiresIn0 {
+		s.lastBit = 0
+		out := s.hiresData(hiresIn0[i])
+		if out != hiresOut0[i] {
+			t.Errorf("Expected hiresData(0x%02X) to be %04X, got %04X", hiresIn0[i], hiresOut0[i], out)
+		}
+		s.lastBit = 1
+		out = s.hiresData(hiresIn0[i])
+		if out != hiresOut0[i] {
+			t.Errorf("Expected hiresData(0x%02X) to be %04X, got %04X", hiresIn0[i], hiresOut0[i], out)
+		}
+	}
+
+	for i := range hiresIn1 {
+		s.lastBit = 0
+		out := s.hiresData(hiresIn1[i])
+		if out != hiresOut1[i] {
+			t.Errorf("Expected hiresData(0x%02X) lb=0 to be %04X, got %04X", hiresIn1[i], hiresOut1[i], out)
+		}
+		s.lastBit = 1
+		out = s.hiresData(hiresIn1[i])
+		if out != hiresOut1[i]|1 {
+			t.Errorf("Expected hiresData(0x%02X) lb=1 to be %04X, got %04X", hiresIn1[i], hiresOut1[i]|1, out)
+		}
+	}
+}

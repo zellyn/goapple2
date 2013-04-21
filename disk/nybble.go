@@ -55,6 +55,11 @@ func (disk *Nybble) Read() byte {
 	return track[disk.position]
 }
 
+func (disk *Nybble) Skip(amount int) {
+	track := disk.Tracks[disk.halfTrack/2]
+	disk.position = (disk.position + amount) % len(track)
+}
+
 func (disk *Nybble) Write(b byte) {
 	track := disk.Tracks[disk.halfTrack/2]
 	disk.position = (disk.position + 1) % len(track)

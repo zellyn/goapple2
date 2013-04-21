@@ -10,6 +10,8 @@ type Card interface {
 	Write256(address byte, value byte) // Write to the $C(slot)XX addresses
 	Read(address uint16) byte          // Read from any address ($C800-$FFFF)
 	Write(address uint16, value byte)  // Write to any address ($C800-$FFFF)
+	WantTicker() bool
+	Tick()
 }
 
 type CardManager interface {

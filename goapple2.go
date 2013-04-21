@@ -2,13 +2,30 @@ package goapple2
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
+	"path/filepath"
+	"strconv"
+	"time"
 
 	"github.com/zellyn/go6502/cpu"
 	"github.com/zellyn/goapple2/cards"
 	"github.com/zellyn/goapple2/videoscan"
 )
 
-// Memory for the tests. Satisfies the cpu.Memory interface.
+type PCActionType int
+
+const (
+	ActionDumpMem PCActionType = iota + 1
+	ActionLogRegisters
+)
+
+type PCAction struct {
+	Type   PCActionType
+	String string
+}
+
+// Apple II struct
 type Apple2 struct {
 	mem             [65536]byte
 	cpu             cpu.Cpu
@@ -26,12 +43,15 @@ type Apple2 struct {
 	card12kMask     byte
 	card12kConflict bool "True if more than one card is handling the 12k ROM area"
 	card12kHandler  byte
+	cardTickerMask  byte
+	pcActions       map[uint16][]PCAction
 }
 
 func NewApple2(p videoscan.Plotter, rom []byte, charRom [2048]byte) *Apple2 {
 	a2 := Apple2{
 		// BUG(zellyn): this is not how the apple2 keyboard actually works
-		keys: make(chan byte, 16),
+		keys:      make(chan byte, 16),
+		pcActions: make(map[uint16][]PCAction),
 	}
 	copy(a2.mem[len(a2.mem)-len(rom):len(a2.mem)], rom)
 	a2.scanner = videoscan.NewScanner(&a2, p, charRom)
@@ -47,6 +67,9 @@ func (a2 *Apple2) AddCard(card cards.Card) error {
 		return fmt.Errorf("Slot %d already has a card: %s", slot, a2.cards[slot])
 	}
 	a2.cardMask |= slotbit
+	if card.WantTicker() {
+		a2.cardTickerMask |= slotbit
+	}
 	a2.cards[slot] = card
 	return nil
 }
@@ -75,20 +98,28 @@ func (a2 *Apple2) handleC00X(address uint16, value byte, write bool) byte {
 		}
 		switch address {
 		case 0xC050: // GRAPHICS
+			fmt.Printf("$%04X: GRAPHICS\n", a2.cpu.PC())
 			a2.scanner.SetGraphics(true)
 		case 0xC051: // TEXT
+			fmt.Printf("$%04X: NO GRAPHICS\n", a2.cpu.PC())
 			a2.scanner.SetGraphics(false)
 		case 0xC052: // NOMIX
+			fmt.Printf("$%04X: NOMIX\n", a2.cpu.PC())
 			a2.scanner.SetMix(false)
 		case 0xC053: // MIX
+			fmt.Printf("$%04X: MIX\n", a2.cpu.PC())
 			a2.scanner.SetMix(true)
 		case 0xC054: // PAGE 1
+			fmt.Printf("$%04X: PAGE1\n", a2.cpu.PC())
 			a2.scanner.SetPage(1)
 		case 0xC055: // PAGE 2
+			fmt.Printf("$%04X: PAGE2\n", a2.cpu.PC())
 			a2.scanner.SetPage(2)
 		case 0xC056: // LORES
+			fmt.Printf("$%04X: LORES\n", a2.cpu.PC())
 			a2.scanner.SetHires(false)
 		case 0xC057: // HIRES
+			fmt.Printf("$%04X: HIRES\n", a2.cpu.PC())
 			a2.scanner.SetHires(true)
 		}
 	}
@@ -197,12 +228,33 @@ func (a2 *Apple2) Keypress(key byte) {
 	a2.keys <- key | 0x80
 }
 
+func (a2 *Apple2) AddPCAction(address uint16, action PCAction) {
+	a2.pcActions[address] = append(a2.pcActions[address], action)
+}
+
 func (a2 *Apple2) Step() error {
+	if actions, ok := a2.pcActions[a2.cpu.PC()]; ok {
+		for _, action := range actions {
+			switch action.Type {
+			case ActionDumpMem:
+				a2.DumpRAM(action.String, true)
+			case ActionLogRegisters:
+				a2.LogRegisters()
+			}
+		}
+	}
 	return a2.cpu.Step()
 }
 
 func (a2 *Apple2) Tick() {
 	a2.scanner.Scan1()
+	tickerMask := a2.cardTickerMask
+	for i := 0; i < 8 && tickerMask > 0; i++ {
+		if tickerMask&1 == 1 {
+			a2.cards[i].Tick()
+		}
+		tickerMask >>= 1
+	}
 }
 
 func (a2 *Apple2) Quit() {
@@ -244,4 +296,25 @@ func (a2 *Apple2) Handle12k(onOff bool, slot byte) {
 			}
 		}
 	}
+}
+
+func (a2 *Apple2) LogRegisters() {
+	c := a2.cpu
+	log.Printf("Registers: PC=$%04X A=$%02X X=$%02X Y=$%02X SP=$%02X P=$%02X=$%08b",
+		c.PC(), c.A(), c.X(), c.Y(), c.SP(), c.P(), c.P())
+}
+func (a2 *Apple2) DumpRAM(filename string, addTimestamp bool) error {
+	f := filename
+	if addTimestamp {
+		ts := "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+		if ext := filepath.Ext(filename); ext == "" {
+			f = filename + ts
+		} else {
+			dir, file := filepath.Split(filename[:len(filename)-len(ext)])
+			f = dir + file + ts + ext
+		}
+	}
+	log.Printf("Dumping RAM to %s", f)
+	a2.LogRegisters()
+	return ioutil.WriteFile(f, a2.mem[:0xC000], 0644)
 }

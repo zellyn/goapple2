@@ -96,15 +96,19 @@ func (s *Scanner) inc() {
 var last [192][40]uint16
 
 func (s *Scanner) Scan1() {
-	m := s.m.RamRead(s.address())
+	address := s.address()
+	if address >= 0xC000 {
+		fmt.Printf("\n\n\nWOAH! $%04X\n\n\n", address)
+	}
+	m := s.m.RamRead(address)
 	row, column := s.row(), s.column()
 	_, _, _ = m, row, column
 	var data uint16
 	switch {
 	case !s.graphics || (s.mix && s.lastFour):
-		data = s.textData(m, row, column)
+		data = s.textData(m, row)
 	case s.hires:
-		data = s.hiresData(m, row, column)
+		data = s.hiresData(m)
 	default: // lores
 		data = s.loresData(m, row, column)
 	}
@@ -112,6 +116,9 @@ func (s *Scanner) Scan1() {
 	if !s.hbl && !s.vbl {
 		change := last[row][column] != (data | s.graphicsBit)
 		if change || s.lastChange {
+			// if row <= 8 && column == 0 {
+			// 	fmt.Printf("%d,%d: RawData=%02X, Data=%04X\n", row, column, m, data)
+			// }
 			s.plotter.Plot(PlotData{
 				Row:        byte(row),
 				Column:     byte(column),
@@ -218,7 +225,7 @@ func (s *Scanner) SetPage(page int) {
 	}
 }
 
-func (s *Scanner) textData(m byte, row int, column int) uint16 {
+func (s *Scanner) textData(m byte, row int) uint16 {
 	line := s.rom[int(m)*8+((row+800)%8)]
 	// Invert if flash
 	if (m^0x80)&line&s.flasher > 127 {
@@ -226,7 +233,7 @@ func (s *Scanner) textData(m byte, row int, column int) uint16 {
 	}
 	line &= 0x7f // Mask out high bit
 	// Now it's just like hires data
-	return s.hiresData(line, row, column)
+	return s.hiresData(line)
 }
 
 // Double each bit to go from pixel info to color info
@@ -249,11 +256,11 @@ var HIRES_DOUBLES = [128]uint16{
 	0x3FC0, 0x3FC3, 0x3FCC, 0x3FCF, 0x3FF0, 0x3FF3, 0x3FFC, 0x3FFF,
 }
 
-func (s *Scanner) hiresData(m byte, row int, column int) uint16 {
+func (s *Scanner) hiresData(m byte) uint16 {
 	if m < 128 {
 		return HIRES_DOUBLES[m]
 	}
-	return ((HIRES_DOUBLES[m&0x7f] << 1) & 0x3ff) | s.lastBit
+	return ((HIRES_DOUBLES[m&0x7f] << 1) & 0x3fff) | s.lastBit
 }
 
 func (s *Scanner) loresData(m byte, row int, column int) uint16 {

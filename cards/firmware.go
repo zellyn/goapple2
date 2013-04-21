@@ -70,3 +70,11 @@ func (fc *FirmwareCard) Read256(address byte) byte {
 func (fc *FirmwareCard) Write256(address byte, value byte) {
 	// Firmware is ROM: do nothing
 }
+
+func (fc *FirmwareCard) WantTicker() bool {
+	return false
+}
+
+func (fc *FirmwareCard) Tick() {
+	// do nothing
+}

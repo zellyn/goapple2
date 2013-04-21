@@ -155,6 +155,59 @@ Apple II notes
 | $F3     |     243 | FLASH MASK                                                     |
 | $F9     |     249 | ROT                                                            |
 
+* Page 00 DOS
+[BAD 8-42]
+
+|---------+-----+-----------------------------------------------|
+| Address | Dec | Description                                   |
+|---------+-----+-----------------------------------------------|
+| 24      |     | Cursor horizontal                             |
+| 26,27   |     | Sector read buffer address (ROM)              |
+| 28,29   |     | BASL/BASH (DOS)                               |
+| 2A      |     | Segment merge counter (ROM,BOOT)              |
+|         |     | Scratch space (RWTS)                          |
+| 2B      |     | BOOT slot*16 (ROM)                            |
+|         |     | Scratch space (RWTS)                          |
+| 2C      |     | Checksum from sector header (RWTS)            |
+| 2D      |     | Sector number form sector header (RWTS)       |
+| 2E      |     | Track number form sector header (RWTS)        |
+| 2F      |     | Volume number form sector header (RWTS)       |
+| 33      |     | Prompt character (DOS)                        |
+| 35      |     | Drive number in high bit (RWTS)               |
+| 36,37   |     | CSWL,CSWH (DOS)                               |
+| 38,39   |     | KSWL,KSWH (DOS)                               |
+| 3C      |     | Workbyte (ROM)                                |
+|         |     | Merge workbyte (BOOT)                         |
+|         |     | Device characteristics table address (RWTS)   |
+| 3D      |     | Sector number (ROM)                           |
+|         |     | Device characteristics table address (RWTS)   |
+| 3E,3F   |     | Address of ROM sector-read subroutine (BOOT)  |
+|         |     | Buffer address (RWTS)                         |
+| 40,41   |     | DOS image address (BOOT)                      |
+|         |     | File buffer address (DOS)                     |
+| 41      |     | Format track counter (RWTS)                   |
+| 42,43   |     | Buffer address (DOS)                          |
+| 44,45   |     | Numeric operand (DOS)                         |
+| 46,47   |     | Scratch space (RWTS)                          |
+| 48,49   |     | IOB address (RWTS)                            |
+| 4A,4B   |     | INTEGER BASIC LOMEM address (DOS)             |
+|         |     | Format diskette workspace (RWTS)              |
+| 4C,4D   |     | INTEGER BASIC HIMEM address (DOS)             |
+| 67,68   |     | APPLESOFT BASIC PROGRAM START (DOS)           |
+| 69,6A   |     | APPLESOFT BASIC VARIABLES START (DOS)         |
+| 6F,70   |     | APPLESOFT BASIC STRING START (DOS)            |
+| 73,74   |     | APPLESOFT BASIC HIMEM address (DOS)           |
+| 76      |     | APPLESOFT BASIC line number high (DOS)        |
+| AF,B0   |     | APPLESOFT BASIC PROGRAM END (DOS)             |
+| CA,CB   |     | INTEGER BASIC PROGRAM START (DOS)             |
+| CC,CD   |     | INTEGER BASIC VARIABLES END (DOS)             |
+| D6      |     | APPLESOFT BASIC PROGRAM protection flag (DOS) |
+| D8,D9   |     | INTEGER BASIC line number (DOS)               |
+|         |     | APPLESOFT BASIC ONERR (DOS)                   |
+|---------+-----+-----------------------------------------------|
+
+
+  
 * Page 03
 
 |-------------+--------------------------------------|
@@ -217,7 +270,7 @@ Apple II notes
 - http://www.textfiles.com/apple/peeks.pokes.2
 - http://www.applefritter.com/node/24236
 - http://www.easy68k.com/paulrsm/6502/index.html - Information about firmware
-- http://www-personal.umich.edu/~mressl/a2dp/index.html - Apple II documentation project
+- http://mirrors.apple2.org.za/Apple%20II%20Documentation%20Project/ - Apple II documentation project
 
 * Language card
 Install in slot 0.
@@ -665,3 +718,30 @@ If track 0 has >15 sync count, the rest of the tracks will have (sync count - 2)
 tracksize 51024
 (/ 51024 8)
 6378
+
+* System disk masters
+https://github.com/cmosher01/Apple-II-System-Masters.git
+http://beagle.applearchives.com/the_software/vintage_beagle_bros_softwar/prontodos.html
+
+
+| 452f496e7c9c447052331f72f643117f | dos331/clean331sysmas.do        |
+| 452f496e7c9c447052331f72f643117f | dos331/original331sysmas.do     |
+| 452f496e7c9c447052331f72f643117f | dos331/stock331mastercreated.do |
+| 5a72964c04e4a37bb8b13a471aa046de | dos331/stock331init.do          |
+| 5ed656da29221d891d056b6b576ae2ce | dos330/stock330init.do          |
+| 6987207d16a72c60de03d8d1c5e267f3 | dos332/clean332sysmas.do        |
+| 6987207d16a72c60de03d8d1c5e267f3 | dos332/original332sysmas.do     |
+| 6987207d16a72c60de03d8d1c5e267f3 | dos332/stock332mastercreated.do |
+| 7df440bb6b3ddd8cbc44009f90a8d18f | dos330/clean330sysmas.do        |
+| 7df440bb6b3ddd8cbc44009f90a8d18f | dos330/original330sysmas.do     |
+| 7df440bb6b3ddd8cbc44009f90a8d18f | dos330/stock330mastercreated.do |
+| 9f79e87fcbcb9885a47f2f462868833f | dos332/stock332init.do          |
+| 7df440bb6b3ddd8cbc44009f90a8d18f | Apple DOS 3.3 August 1980.dsk   |
+| 452f496e7c9c447052331f72f643117f | Apple DOS 3.3 January 1983.dsk  |
+| 92e8fc0c4e79e50f2d81a14cfa55b151 | DavidDOS.dsk                    |
+| c17928ee915b9bf5c4041621fa8a0cb4 | DiversiDOS.dsk                  |
+| 6390fc84edf64dd88682b920ff88bbfa | Prontodos/Prontodos.dsk         |
+| 5b9894778b6b97d56d1199ab13b0db66 | EsDos.dsk                       |
+
+| db809f937c0de0a12cb70897ed9a72da | chivalry.dsk |
+

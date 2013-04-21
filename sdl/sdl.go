@@ -261,6 +261,7 @@ func (s SdlPlotter) OncePerFrame() {
 }
 
 func typeProgram(a2 *goapple2.Apple2) {
+	return
 	lines := []string{
 		"10 GR",
 		"20 POKE -16302,0",
@@ -270,6 +271,14 @@ func typeProgram(a2 *goapple2.Apple2) {
 		"60 PLOT X,Y",
 		"70 NEXT",
 		"80 NEXT",
+		"RUN",
+	}
+	lines = []string{
+		"10 HGR2",
+		"20 FOR I = 0 to 7",
+		"30 HCOLOR=7-I",
+		"40 HPLOT I*10, 0 TO 191 + I*10, 191",
+		"50 NEXT",
 		"RUN",
 	}
 	for _, line := range lines {
@@ -315,10 +324,11 @@ func RunEmulator() {
 		log.Fatal(err)
 	}
 	disk1 := disk.NewNybble()
+	// if err = disk1.LoadDosDisk("../data/disks/spedtest.dsk"); err != nil {
+	// if err = disk1.LoadDosDisk("../data/disks/dung_beetles.dsk"); err != nil {
 	if err = disk1.LoadDosDisk("../data/disks/chivalry.dsk"); err != nil {
 		log.Fatal(err)
 	}
-	disk1.SetHalfTrack(50)
 	diskCard.LoadDisk(disk1, 0)
 
 	steps := *steplimit
@@ -332,7 +342,10 @@ func RunEmulator() {
 		defer pprof.StopCPUProfile()
 	}
 
-	go typeProgram(a2)
+	a2.AddPCAction(0xC6EB, goapple2.PCAction{goapple2.ActionDumpMem, "chivalry-dump.bin"})
+	a2.AddPCAction(0x1F76, goapple2.PCAction{goapple2.ActionDumpMem, "chivalry-dump.bin"})
+
+	// go typeProgram(a2)
 
 	for !a2.Done {
 		err := a2.Step()

@@ -96,12 +96,13 @@ func appendSyncs(target []byte, count int) []byte {
 
 // append44 appends bytes using the 4-4 encoded format used for volume, track, sector, checksum.
 func append44(target []byte, b byte) []byte {
-	return append(target, 0xAA|b<<1, 0xAA|b)
+	return append(target, 0xAA|(b>>1), 0xAA|b)
 }
 
 // appendAddress appends the encoded sector address to the slice, and returns the resulting slice.
 func appendAddress(target []byte, t, s, v byte) []byte {
 	target = append(target, 0xD5, 0xAA, 0x96)
+	fmt.Println("s=", s)
 	target = append44(target, v)
 	target = append44(target, t)
 	target = append44(target, s)
