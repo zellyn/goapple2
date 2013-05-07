@@ -20,5 +20,8 @@ _cgo_export.*
 _testmain.go
 
 *.exe
+*.prof
+sdl/sdl
+a2/a2
 
-data/roms
+data/
