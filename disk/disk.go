@@ -1,6 +1,7 @@
 package disk
 
 const (
+	NUM_TRACKS           = 35
 	DOS_DISK_BYTES       = 143360 // 35 tracks * 16 sectors * 256 bytes
 	DOS_TRACK_BYTES      = DOS_DISK_BYTES / 35
 	NYBBLE_DISK_BYTES    = 232960

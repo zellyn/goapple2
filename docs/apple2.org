@@ -712,36 +712,3 @@ If track 0 has >15 sync count, the rest of the tracks will have (sync count - 2)
 |             |        (* 416 16) 6656 |     (* 413 16) 6608 |      (* 16 391) 6256 | (* 16 12708) 203328         |
 |             |                   6656 |    (+ 6608 48) 6656 |    (+ 6256 108) 6364 | (+ 203328 4320) 207648      |
 |             |                        |                     |                      | (/ 207648 4) 51912          |
-
-
-
-tracksize 51024
-(/ 51024 8)
-6378
-
-* System disk masters
-https://github.com/cmosher01/Apple-II-System-Masters.git
-http://beagle.applearchives.com/the_software/vintage_beagle_bros_softwar/prontodos.html
-
-
-| 452f496e7c9c447052331f72f643117f | dos331/clean331sysmas.do        |
-| 452f496e7c9c447052331f72f643117f | dos331/original331sysmas.do     |
-| 452f496e7c9c447052331f72f643117f | dos331/stock331mastercreated.do |
-| 5a72964c04e4a37bb8b13a471aa046de | dos331/stock331init.do          |
-| 5ed656da29221d891d056b6b576ae2ce | dos330/stock330init.do          |
-| 6987207d16a72c60de03d8d1c5e267f3 | dos332/clean332sysmas.do        |
-| 6987207d16a72c60de03d8d1c5e267f3 | dos332/original332sysmas.do     |
-| 6987207d16a72c60de03d8d1c5e267f3 | dos332/stock332mastercreated.do |
-| 7df440bb6b3ddd8cbc44009f90a8d18f | dos330/clean330sysmas.do        |
-| 7df440bb6b3ddd8cbc44009f90a8d18f | dos330/original330sysmas.do     |
-| 7df440bb6b3ddd8cbc44009f90a8d18f | dos330/stock330mastercreated.do |
-| 9f79e87fcbcb9885a47f2f462868833f | dos332/stock332init.do          |
-| 7df440bb6b3ddd8cbc44009f90a8d18f | Apple DOS 3.3 August 1980.dsk   |
-| 452f496e7c9c447052331f72f643117f | Apple DOS 3.3 January 1983.dsk  |
-| 92e8fc0c4e79e50f2d81a14cfa55b151 | DavidDOS.dsk                    |
-| c17928ee915b9bf5c4041621fa8a0cb4 | DiversiDOS.dsk                  |
-| 6390fc84edf64dd88682b920ff88bbfa | Prontodos/Prontodos.dsk         |
-| 5b9894778b6b97d56d1199ab13b0db66 | EsDos.dsk                       |
-
-| db809f937c0de0a12cb70897ed9a72da | chivalry.dsk |
-

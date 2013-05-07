@@ -15,6 +15,7 @@ func init() {
 		Name: os.Args[0],
 		Commands: []*commander.Command{
 			cmdDisasm,
+			cmdDiskConvert,
 		},
 		Flag: flag.NewFlagSet("a2", flag.ExitOnError),
 	}

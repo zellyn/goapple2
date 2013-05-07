@@ -89,3 +89,165 @@ $1DCA: 85 77    STA $77
 $1DCC: BD 5E 1E LDA $1E5E,X
 $1DCF: 85 64    STA $64    
 $1DD1: 60       RTS        
+
+** Boot sector addresses
+$26 buffer pointer
+$2B boot slot
+$3D Last bsectr read
+$3E address btemp
+$5C offset to reader
+
+* apple][js shim
+disk_categories['Local Saves'].push({category: 'Game', filename: 'http://localhost:8000/chivalry.json', name: 'Chivalry'})
+
+* Nybble files
+
+** apple2js
+d5 aa 96 ff fe aa aa af af fa fb de aa eb
+
+d5 aa ad ff 96 96 a7 9d ae 96 d6 b4 ed 96 96 96 a7 9e b2 96 d6 b6 f2
+9b 96 96 a7 96 b2 97 d7 b6 ef 9a 96 96 9d 97 97 96 d6 b5 ee 97 96 96
+96 96 96 96 d6 b9 f9 9a 9b a7 ae ae 96 96 d6 96 fa 9e a6 a7 a7 a7 96
+96 b4 f3 9f 97 9b 9d 9d 9d 96 96 d6 ed ef d7 f2 ed b9 bd ae ea 96 96
+96 ac ad 96 96 ad ad 97 96 96 96 a7 ac ac ac ac 9b af 96 96 96 b2 ac
+ad ad ac ac 97 96 96 96 ac ac 96 96 ac ac da 9f 96 96 96 96 96 96 96
+96 9a a6 96 96 96 96 96 96 96 a6 96 a6 96 96 96 96 96 96 96 a6 96 a6
+96 96 96 96 96 96 96 a6 96 a6 96 96 96 96 96 96 96 a6 96 a6 96 96 96
+96 96 96 96 a6 96 a6 96 96 96 96 96 96 96 a6 97 97 96 96 96 96 96 96
+96 96 db 96 96 96 ac ad 96 96 ad ad 97 96 96 96 a7 ac ac ac ac 9b af
+96 96 96 b2 ac ad ad ac ac 97 96 96 96 ac ac 96 96 ac ac da 9f 96 96
+96 96 96 96 96 96 9a a6 96 96 96 96 96 96 96 a6 96 a6 96 96 96 96 96
+96 96 a6 96 a6 96 96 96 96 96 96 96 a6 96 a6 96 96 96 96 96 96 96 a6
+96 a6 96 96 96 96 96 96 96 a6 96 a6 96 96 96 96 96 96 96 a6 97 97 96
+96 96 96 96 96 96 96 9f 96 96 96 96 96 96 96 b2 f3 fb ef be ad af eb
+9a de aa eb
+
+** Mine
+
+d5 aa 96 ff fe aa aa af af fa fb de aa eb
+
+d5 aa ad ff 96 96 a7 9d ae 96 d6 b4 ed 96 96 96 a7 9e b2 96 d6 b6 f2
+9b 96 96 a7 96 b2 97 d7 b6 ef 9a 96 96 9d 97 97 96 d6 b5 ee 97 96 96
+96 96 96 96 d6 b9 f9 9a 9b a7 ae ae 96 96 d6 96 fa 9e a6 a7 a7 a7 96
+96 b4 f3 9f 97 9b 9d 9d 9d 96 96 d6 ed ef d7 f2 ed b9 df ae ce 96 96
+96 ac ad 96 96 ad ad 97 96 96 96 a7 ac ac ac ac 9b af 96 96 96 b2 ac
+ad ad ac ac 97 96 96 96 ac ac 96 96 ac ac da 9f 96 96 96 96 96 96 96
+96 9a a6 96 96 96 96 96 96 96 a6 96 a6 96 96 96 96 96 96 96 a6 96 a6
+96 96 96 96 96 96 96 a6 96 a6 96 96 96 96 96 96 96 a6 96 a6 96 96 96
+96 96 96 96 a6 96 a6 96 96 96 96 96 96 96 a6 97 97 96 96 96 96 96 96
+96 96 db 96 96 96 ac ad 96 96 ad ad 97 96 96 96 a7 ac ac ac ac 9b af
+96 96 96 b2 ac ad ad ac ac 97 96 96 96 ac ac 96 96 ac ac da 9f 96 96
+96 96 96 96 96 96 9a a6 96 96 96 96 96 96 96 a6 96 a6 96 96 96 96 96
+96 96 a6 96 a6 96 96 96 96 96 96 96 a6 96 a6 96 96 96 96 96 96 96 a6
+96 a6 96 96 96 96 96 96 96 a6 96 a6 96 96 96 96 96 96 96 a6 97 97 96
+96 96 96 96 96 96 96 9f 96 96 96 96 96 96 96 b2 f3 fb ef be ad af eb
+9a de aa eb
+* Divergence?
+$B700: (797128) No
+$8004: (14016092) Yes
+
+* Slot 6 accesses from:
+
+   1 Slot6 access from $C632
+   1 Slot6 access from $C635
+   1 Slot6 access from $C638
+   1 Slot6 access from $C63B
+   1 Slot6 access from $C640
+   1 Slot6 access from $C64A
+
+$C661: 14, 367, 767, etc.
+$C6AD: 86
+$C6BF: 256
+
+$B952: 10, 367, etc.
+$B907: 86
+$B918: 256
+
+0xB942: error return
+0xB942: good return
+
+
+* Possibly innocuous differences:
+38,39c38,40
+< $0026: FD FD
+---
+> $0026: F7 F2
+
+
+< $002C: FD 02
+---
+> $002C: F2 0D
+
+
+< $01FC: 30
+---
+> $01FC: 34
+
+
+26,27
+2C:
+2D:
+
+
+2D: 0D - sector number from header
+2E: 01 - track number from sector header
+2F: FE - volume number from sector header
+2C: F2 - sector header checksum
+
+
+CURRENT.TRACK       .EQ $478
+DRIVE.1.TRACK       .EQ $478 THRU 47F (INDEX BY SLOT)
+DRIVE.2.TRACK       .EQ $4F8 THRU 4FF (INDEX BY SLOT)
+SEARCH.COUNT        .EQ $4F8
+RETRY.COUNT         .EQ $578
+SLOT                .EQ $5F8
+SEEK.COUNT          .EQ $6F8
+SECTOR     .EQ $2D
+TRACK      .EQ $2A
+VOLUME     .EQ $2F
+DRIVE.NO   .EQ $35
+DCT.PNTR   .EQ $3C,3D
+BUF.PNTR   .EQ $3E,3F
+MOTOR.TIME .EQ $46,47
+IOB.PNTR   .EQ $48,49
+
+* Append A,X,Y,SP,P,PC
+NOP: EA
+LDA #$00: A9 00
+LDX #$00: A2 00
+LDY #$00: A0 00
+CMP #$AA: C9 AA
+PHP #$08
+PLA #$68
+
+
+* Notes - status
+
+0xB99E - is not a good address, because it's used to return from READ.ADDRESS as well as READ.SECTOR.
+
+** After 69th sector access
+   100: a2js: 0xB8C7, goa2: 0xB8C7 - match
+125000: a2js: 0x1DC0, goa2: 0x1DC0 - match
+187500: a2js: 0x1DA5, goa2: 0x1DA5 - match
+195312: a2js: 0x1F69, goa2: 0x1F69 - match
+197265: a2js: 0x1DB7, goa2: 0x1DB7 - match
+197509: a2js: 0x02F8, goa2: 0x02F8 - match
+197631: a2js: 0x030C, goa2: 0x030C - match
+197646: a2js: 0xBD13, goa2: 0xBD13 - match
+197653: a2js: 0xBD3F, goa2: 0xBD3F - match
+197657: a2js: 0xBD43, goa2: 0xBD43 - match
+197659: a2js: 0xBD49, goa2: 0xBD49 - DIFF in P
+197661: a2js: 0xBD4F, goa2: 0xBD4C - LOTS!
+197692: a2js: 0xBD70, goa2: 0xBD3C - LOTS!
+197753: a2js: 0xBA03, goa2: 0xBD5A - DIFF!
+198241: a2js: 0xBA03, goa2: 0xBA03 - DIFF in A,X
+199218: a2js: 0xBA02, goa2: 0xBA02 - DIFF in X
+203125: a2js: 0xBA03, goa2: 0xBA03 - DIFF in A,X
+218750: a2js: 0xBA05, goa2: 0xBA02 - DIFF!
+250000: a2js: 0xBA03, goa2: 0xBA0C - DIFF!
+500000: a2js: 0xBDA0, goa2: 0xBDA1 - DIFF!
+
+(/ (+ 197657 197661) 2)
+197659
+
+

@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/0xe2-0x9a-0x9b/Go-SDL/sdl"
+	"github.com/zellyn/go6502/cpu"
 	"github.com/zellyn/goapple2"
 	"github.com/zellyn/goapple2/cards"
 	"github.com/zellyn/goapple2/disk"
@@ -323,10 +324,10 @@ func RunEmulator() {
 	if err := a2.AddCard(diskCard); err != nil {
 		log.Fatal(err)
 	}
-	disk1 := disk.NewNybble()
-	// if err = disk1.LoadDosDisk("../data/disks/spedtest.dsk"); err != nil {
-	// if err = disk1.LoadDosDisk("../data/disks/dung_beetles.dsk"); err != nil {
-	if err = disk1.LoadDosDisk("../data/disks/chivalry.dsk"); err != nil {
+	// disk1, err := disk.DiskFromFile("../data/disks/spedtest.dsk", 0)
+	// disk1, err := disk.DiskFromFile("../data/disks/dung_beetles.dsk", 0)
+	disk1, err := disk.DiskFromFile("../data/disks/chivalry.dsk", 0)
+	if err != nil {
 		log.Fatal(err)
 	}
 	diskCard.LoadDisk(disk1, 0)
@@ -342,8 +343,33 @@ func RunEmulator() {
 		defer pprof.StopCPUProfile()
 	}
 
-	a2.AddPCAction(0xC6EB, goapple2.PCAction{goapple2.ActionDumpMem, "chivalry-dump.bin"})
-	a2.AddPCAction(0x1F76, goapple2.PCAction{goapple2.ActionDumpMem, "chivalry-dump.bin"})
+	/*
+			a2.AddPCAction(
+				0xB940, goapple2.PCAction{Type: goapple2.ActionDumpMem, String: "0xB940-goa2.bin",
+					Mask: cpu.FLAG_Z, Masked: cpu.FLAG_Z, Delay: 68})
+		a2.AddPCAction(0xB7B5, goapple2.PCAction{Type: goapple2.ActionHere, String: "ENTER.RWTS"})
+		a2.AddPCAction(0xB7BE, goapple2.PCAction{Type: goapple2.ActionHere, String: "ENTER.RWTS - Success"})
+		a2.AddPCAction(0xB7C1, goapple2.PCAction{Type: goapple2.ActionHere, String: "ENTER.RWTS - Fail"})
+		a2.AddPCAction(0xBD00, goapple2.PCAction{Type: goapple2.ActionHere, String: "RWTS"})
+		a2.AddPCAction(0xBDAF, goapple2.PCAction{Type: goapple2.ActionHere, String: "RWTS Command"})
+		// a2.AddPCAction(0xBE35, goapple2.PCAction{Type: goapple2.ActionHere, String: "RWTS READ.SECTOR call"})
+		// a2.AddPCAction(0xBE38, goapple2.PCAction{Type: goapple2.ActionHere, String: "RWTS READ.SECTOR success"})
+
+		a2.AddPCAction(0xBE46, goapple2.PCAction{Type: goapple2.ActionHere, String: "RWTS Success"})
+		a2.AddPCAction(0xBE48, goapple2.PCAction{Type: goapple2.ActionHere, String: "RWTS Error"})
+
+		a2.AddPCAction(0xBDAF, goapple2.PCAction{Type: goapple2.ActionDiskStatus})
+
+		a2.AddPCAction(0xBDAF, goapple2.PCAction{Type: goapple2.ActionTrace, String: "on",
+			Delay: 70})
+
+		a2.AddPCAction(
+			0xBE48, goapple2.PCAction{Type: goapple2.ActionSetLimit, String: "1"})
+
+		a2.AddPCAction(
+			0xBDAF, goapple2.PCAction{Type: goapple2.ActionDumpMem, String: "0xBDAF-goa2.bin", Delay: 68})
+	*/
+	_ = cpu.FLAG_Z
 
 	// go typeProgram(a2)
 

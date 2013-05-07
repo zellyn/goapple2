@@ -2,6 +2,9 @@ package disk
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
+	"path"
 )
 
 // Dos33writeTable is the list of valid DOS 3.3 bytes.
@@ -15,6 +18,17 @@ var Dos33writeTable = [64]byte{
 	0xDF, 0xE5, 0xE6, 0xE7, 0xE9, 0xEA, 0xEB, 0xEC,
 	0xED, 0xEE, 0xEF, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6,
 	0xF7, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF,
+}
+
+var Dos33readTable [256]int
+
+func init() {
+	for i := 0; i < 256; i++ {
+		Dos33readTable[i] = -1
+	}
+	for i, j := range Dos33writeTable {
+		Dos33readTable[j] = int(i)
+	}
 }
 
 // Dos33LogicalToPhysicalSectorMap maps logical sector numbers to physical ones.
@@ -102,7 +116,6 @@ func append44(target []byte, b byte) []byte {
 // appendAddress appends the encoded sector address to the slice, and returns the resulting slice.
 func appendAddress(target []byte, t, s, v byte) []byte {
 	target = append(target, 0xD5, 0xAA, 0x96)
-	fmt.Println("s=", s)
 	target = append44(target, v)
 	target = append44(target, t)
 	target = append44(target, s)
@@ -169,4 +182,178 @@ func dos16ToNybbleTracks(source []byte, v byte, preSync, intraSync int, sectorOr
 		tracks = append(tracks, track)
 	}
 	return tracks, nil
+}
+
+func NybbleToDos16(nyb *Nybble, sectorOrder []byte) (bytes []byte, err error) {
+	// Save current disk position
+	pos := nyb.GetPos()
+	defer nyb.SetPos(pos)
+	var trackBytes [DOS_TRACK_BYTES]byte
+	for track := byte(0); track < NUM_TRACKS; track++ {
+		nyb.SetHalfTrack(track * 2)
+		seen := uint16(0)
+		for i := 0; i < 16; i++ {
+			sector, err := readOneSector(nyb)
+			if err != nil {
+				return nil, err
+			}
+			if sector.Sector > 15 {
+				return nil, fmt.Errorf("Found unexpected sector number on track %d: %d", track, sector.Sector)
+			}
+			if seen&(1<<sector.Sector) > 0 {
+				return nil, fmt.Errorf("Found sector %d twice on track %d", sector.Sector, track)
+			}
+			seen |= 1 << sector.Sector
+			start := 256 * int(sectorOrder[sector.Sector])
+			copy(trackBytes[start:start+256], sector.Data[:])
+		}
+		bytes = append(bytes, trackBytes[:]...)
+	}
+	return bytes, nil
+}
+
+// DiskToFile saves a Nybble disk to a given filename.
+func DiskToFile(filename string, disk *Nybble) error {
+	ext := path.Ext(filename)
+	switch ext {
+	case ".nib":
+		var bytes []byte
+		for _, track := range disk.Tracks {
+			bytes = append(bytes, track...)
+		}
+		err := ioutil.WriteFile(filename, bytes, 0644)
+		if err != nil {
+			return err
+		}
+		return nil
+	case ".dsk", ".do", ".po":
+		sectorOrder := Dos33PhysicalToLogicalSectorMap
+		if ext == ".po" {
+			sectorOrder = ProDosPhysicalToLogicalSectorMap
+		}
+		bytes, err := NybbleToDos16(disk, sectorOrder)
+		if err != nil {
+			return err
+		}
+		if err = ioutil.WriteFile(filename, bytes, 0644); err != nil {
+			return err
+		}
+		return nil
+	}
+	return fmt.Errorf("Cannot save to file %s: unexpected extension %s", filename, ext)
+}
+
+// DiskFromFile loads a Nybble disk, given a filename.
+// defaultVolume is the disk volume used if the file doesn't encode it, 0 for default (254).
+func DiskFromFile(filename string, defaultVolume byte) (disk *Nybble, err error) {
+	volume := defaultVolume
+	if volume == 0 {
+		volume = DEFAULT_VOLUME
+	}
+	ext := path.Ext(filename)
+	bytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	switch ext {
+	case ".dsk", ".do", ".po":
+		sectorOrder := Dos33PhysicalToLogicalSectorMap
+		if ext == ".po" {
+			sectorOrder = ProDosPhysicalToLogicalSectorMap
+		}
+		if len(bytes) != DOS_DISK_BYTES {
+			return nil, fmt.Errorf("Expected %d bytes in file %s, got %d", DOS_DISK_BYTES, filename, len(bytes))
+		}
+		tracks, err := dos16ToNybbleTracks(bytes, volume, DEFAULT_PRESYNC, DEFAULT_INTRASYNC, sectorOrder)
+		if err != nil {
+			return nil, err
+		}
+		nyb := NewNybble(tracks)
+		return nyb, nil
+	case ".nib":
+		if len(bytes) != NYBBLE_DISK_BYTES {
+			return nil, fmt.Errorf("Expected %d bytes in file %s, got %d", NYBBLE_DISK_BYTES, filename, len(bytes))
+		}
+		var tracks [][]byte
+		for i := 0; i < NUM_TRACKS; i++ {
+			start := NYBBLE_TRACK_BYTES * i
+			tracks = append(tracks, bytes[start:start+NYBBLE_TRACK_BYTES])
+		}
+		nyb := NewNybble(tracks)
+		return nyb, nil
+	}
+	return nil, fmt.Errorf("Unknown suffix (not .dsk, .do, or .po): %s", filename)
+}
+
+type Sector struct {
+	Volume byte
+	Track  byte
+	Sector byte
+	Data   [256]byte
+}
+
+func read44(nyb *Nybble) byte {
+	return (nyb.Read()<<1 | 1) & nyb.Read()
+}
+
+func readOneSector(nyb *Nybble) (result Sector, err error) {
+	count := int(NYBBLE_TRACK_BYTES)
+OUTER:
+	for ; count > 0; count-- {
+		if nyb.Read() != 0xD5 {
+			continue
+		}
+		if nyb.Read() != 0xAA {
+			continue
+		}
+		if nyb.Read() != 0x96 {
+			continue
+		}
+		result.Volume = read44(nyb)
+		result.Track = read44(nyb)
+		result.Sector = read44(nyb)
+		checksum := read44(nyb)
+		count -= 10
+		if checksum != result.Volume^result.Track^result.Sector {
+			continue
+		}
+		for nyb.Read() != 0xD5 {
+			count--
+		}
+		if nyb.Read() != 0xAA {
+			continue
+		}
+		if nyb.Read() != 0xAD {
+			continue
+		}
+		var raw [342]byte
+		xor := byte(0)
+		for i := 341; i >= 256; i-- {
+			count--
+			bi := Dos33readTable[nyb.Read()]
+			if bi < 0 {
+				continue OUTER
+			}
+			b := byte(bi) ^ xor
+			raw[i] = b
+			xor = b
+		}
+		for i := 0; i < 256; i++ {
+			count--
+			bi := Dos33readTable[nyb.Read()]
+			if bi < 0 {
+				continue OUTER
+			}
+			b := byte(bi) ^ xor
+			raw[i] = b
+			xor = b
+		}
+		if int(xor) != Dos33readTable[nyb.Read()] {
+			log.Print("Checksum error")
+			continue
+		}
+		result.Data = PostNybble(raw[:])
+		return result, nil
+	}
+	return result, fmt.Errorf("Unable to read sector")
 }

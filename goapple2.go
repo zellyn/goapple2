@@ -6,7 +6,6 @@ import (
 	"log"
 	"path/filepath"
 	"strconv"
-	"time"
 
 	"github.com/zellyn/go6502/cpu"
 	"github.com/zellyn/goapple2/cards"
@@ -18,11 +17,18 @@ type PCActionType int
 const (
 	ActionDumpMem PCActionType = iota + 1
 	ActionLogRegisters
+	ActionTrace
+	ActionSetLimit
+	ActionHere
+	ActionDiskStatus
 )
 
 type PCAction struct {
 	Type   PCActionType
 	String string
+	Mask   byte
+	Masked byte
+	Delay  uint64
 }
 
 // Apple II struct
@@ -44,14 +50,16 @@ type Apple2 struct {
 	card12kConflict bool "True if more than one card is handling the 12k ROM area"
 	card12kHandler  byte
 	cardTickerMask  byte
-	pcActions       map[uint16][]PCAction
+	pcActions       map[uint16][]*PCAction
+	limit           int
+	cycle           uint64
 }
 
 func NewApple2(p videoscan.Plotter, rom []byte, charRom [2048]byte) *Apple2 {
 	a2 := Apple2{
 		// BUG(zellyn): this is not how the apple2 keyboard actually works
 		keys:      make(chan byte, 16),
-		pcActions: make(map[uint16][]PCAction),
+		pcActions: make(map[uint16][]*PCAction),
 	}
 	copy(a2.mem[len(a2.mem)-len(rom):len(a2.mem)], rom)
 	a2.scanner = videoscan.NewScanner(&a2, p, charRom)
@@ -207,6 +215,9 @@ func (a2 *Apple2) RamRead(address uint16) byte {
 }
 
 func (a2 *Apple2) Write(address uint16, value byte) {
+	// if address == 0x46 {
+	// 	fmt.Printf("Write to 0x46: PC==$%04X\n", a2.cpu.PC())
+	// }
 	if address >= 0xD000 {
 		if a2.cardRomMask > 0 {
 			if a2.card12kConflict {
@@ -229,21 +240,54 @@ func (a2 *Apple2) Keypress(key byte) {
 }
 
 func (a2 *Apple2) AddPCAction(address uint16, action PCAction) {
-	a2.pcActions[address] = append(a2.pcActions[address], action)
+	a2.pcActions[address] = append(a2.pcActions[address], &action)
 }
 
 func (a2 *Apple2) Step() error {
+	p := a2.cpu.P()
 	if actions, ok := a2.pcActions[a2.cpu.PC()]; ok {
 		for _, action := range actions {
+			if p&action.Mask != action.Masked {
+				continue
+			}
+			if action.Delay > 0 {
+				fmt.Printf("Delaying %v: %d\n", action.Type, action.Delay)
+				action.Delay--
+				continue
+			}
 			switch action.Type {
 			case ActionDumpMem:
-				a2.DumpRAM(action.String, true)
+				a2.DumpRAM(action.String)
 			case ActionLogRegisters:
 				a2.LogRegisters()
+			case ActionTrace:
+				a2.cpu.Print(action.String == "on" || action.String == "true")
+			case ActionSetLimit:
+				if i, err := strconv.Atoi(action.String); err == nil {
+					a2.limit = i
+				} else {
+					panic(err)
+				}
+			case ActionHere:
+				fmt.Printf("$%04X: (%d) %s - A=$%02X X=$%02X Y=$%02X SP=$%02X P=$%08b\n",
+					a2.cpu.PC(), a2.cycle, action.String,
+					a2.cpu.A(), a2.cpu.X(), a2.cpu.Y(), a2.cpu.SP(), a2.cpu.P())
+			case ActionDiskStatus:
+				fmt.Printf("$%04X: %v\n",
+					a2.cpu.PC(), a2.cards[6])
 			}
 		}
 	}
-	return a2.cpu.Step()
+	err := a2.cpu.Step()
+	if a2.limit > 0 {
+		a2.limit--
+		if a2.limit == 0 {
+			a2.DumpRAM("limit-goa2.bin")
+			panic("Limit reached")
+		}
+	}
+	a2.cycle++
+	return err
 }
 
 func (a2 *Apple2) Tick() {
@@ -303,18 +347,32 @@ func (a2 *Apple2) LogRegisters() {
 	log.Printf("Registers: PC=$%04X A=$%02X X=$%02X Y=$%02X SP=$%02X P=$%02X=$%08b",
 		c.PC(), c.A(), c.X(), c.Y(), c.SP(), c.P(), c.P())
 }
-func (a2 *Apple2) DumpRAM(filename string, addTimestamp bool) error {
+
+var dumpCount = 0
+
+func (a2 *Apple2) DumpRAM(filename string) error {
 	f := filename
-	if addTimestamp {
-		ts := "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-		if ext := filepath.Ext(filename); ext == "" {
-			f = filename + ts
-		} else {
-			dir, file := filepath.Split(filename[:len(filename)-len(ext)])
-			f = dir + file + ts + ext
-		}
+	dumpCount++
+	ts := "-" + fmt.Sprintf("%05d", dumpCount)
+	if ext := filepath.Ext(filename); ext == "" {
+		f = filename + ts
+	} else {
+		dir, file := filepath.Split(filename[:len(filename)-len(ext)])
+		f = dir + file + ts + ext
 	}
 	log.Printf("Dumping RAM to %s", f)
 	a2.LogRegisters()
-	return ioutil.WriteFile(f, a2.mem[:0xC000], 0644)
+	buf := make([]byte, 0xC000, 0xC000+20)
+	copy(buf, a2.mem[:0xC000])
+	// LDA $A
+	// LDX $X
+	// LDY $Y
+	buf = append(buf, 0xA9, a2.cpu.A(), 0xA2, a2.cpu.X(), 0xA0, a2.cpu.Y())
+	// PHP, PLA, CMP $P
+	buf = append(buf, 0x08, 0x68, 0xC9, a2.cpu.P())
+	// TSX, CPX $SP
+	buf = append(buf, 0xBA, 0xE0, a2.cpu.SP())
+	// JMP $PC
+	buf = append(buf, 0x4C, byte(a2.cpu.PC()&0xFF), byte(a2.cpu.PC()>>8))
+	return ioutil.WriteFile(f, buf, 0644)
 }

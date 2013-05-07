@@ -22,14 +22,6 @@ func (v Dummy) HalfTrack() byte {
 	return 0
 }
 
-func (v Dummy) SetVolume(byte) {
-	// pass
-}
-
-func (v Dummy) Volume() byte {
-	return byte(v)
-}
-
 func (v Dummy) Writeable() bool {
 	return false
 }
