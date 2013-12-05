@@ -10,7 +10,7 @@ import (
 	"runtime/pprof"
 	"unsafe"
 
-	"github.com/0xe2-0x9a-0x9b/Go-SDL/sdl"
+	"github.com/zellyn/Go-SDL/sdl"
 	"github.com/zellyn/go6502/cpu"
 	"github.com/zellyn/goapple2"
 	"github.com/zellyn/goapple2/cards"
