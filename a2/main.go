@@ -8,25 +8,21 @@ import (
 	"github.com/gonuts/flag"
 )
 
-var a2cmd *commander.Commander
+var a2cmd *commander.Command
 
 func init() {
-	a2cmd = &commander.Commander{
-		Name: os.Args[0],
-		Commands: []*commander.Command{
+	a2cmd = &commander.Command{
+		UsageLine: "a2",
+		Subcommands: []*commander.Command{
 			cmdDisasm,
 			cmdDiskConvert,
 		},
-		Flag: flag.NewFlagSet("a2", flag.ExitOnError),
+		Flag: *flag.NewFlagSet("a2", flag.ExitOnError),
 	}
 }
 
 func main() {
-	if err := a2cmd.Flag.Parse(os.Args[1:]); err != nil {
-		log.Fatal(err)
-	}
-	args := a2cmd.Flag.Args()
-	if err := a2cmd.Run(args); err != nil {
+	if err := a2cmd.Dispatch(os.Args[1:]); err != nil {
 		log.Fatal(err)
 	}
 }

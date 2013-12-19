@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"fmt"
 
 	"github.com/gonuts/commander"
 	"github.com/zellyn/goapple2/disk"
@@ -22,19 +22,21 @@ func init() {
 	cmdDiskConvert.Flag.UintVar(&diskVolume, "v", 0, "The volume of the disk, or 0 for default.")
 }
 
-func runDiskConvert(cmd *commander.Command, args []string) {
+func runDiskConvert(cmd *commander.Command, args []string) error {
 	if len(args) != 2 {
 		cmd.Usage()
-		return
+		return nil
 	}
 	if diskVolume > 254 {
-		log.Fatalf("disk volume must be 0-254, got %d", diskVolume)
+		return fmt.Errorf("disk volume must be 0-254, got %d", diskVolume)
 	}
 	nyb, err := disk.DiskFromFile(args[0], byte(diskVolume))
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if err = disk.DiskToFile(args[1], nyb); err != nil {
-		log.Fatal(err)
+		return err
 	}
+
+	return err
 }
