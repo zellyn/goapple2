@@ -56,16 +56,16 @@ type Apple2 struct {
 }
 
 func NewApple2(p videoscan.Plotter, rom []byte, charRom [2048]byte) *Apple2 {
-	a2 := Apple2{
+	a2 := &Apple2{
 		// BUG(zellyn): this is not how the apple2 keyboard actually works
 		keys:      make(chan byte, 16),
 		pcActions: make(map[uint16][]*PCAction),
 	}
 	copy(a2.mem[len(a2.mem)-len(rom):len(a2.mem)], rom)
-	a2.scanner = videoscan.NewScanner(&a2, p, charRom)
-	a2.cpu = cpu.NewCPU(&a2, &a2, cpu.VERSION_6502)
+	a2.scanner = videoscan.NewScanner(a2, p, charRom)
+	a2.cpu = cpu.NewCPU(a2, a2.Tick, cpu.VERSION_6502)
 	a2.cpu.Reset()
-	return &a2
+	return a2
 }
 
 func (a2 *Apple2) AddCard(card cards.Card) error {
