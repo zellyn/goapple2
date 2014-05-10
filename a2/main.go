@@ -16,6 +16,7 @@ func init() {
 		Subcommands: []*commander.Command{
 			cmdDisasm,
 			cmdDiskConvert,
+			cmdCharROM,
 		},
 		Flag: *flag.NewFlagSet("a2", flag.ExitOnError),
 	}
