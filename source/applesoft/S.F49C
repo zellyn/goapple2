@@ -1,0 +1,223 @@
+1010 *--------------------------------
+1020 *      "XDRAW" ONE BIT
+1030 *--------------------------------
+1040 LRUDX1 CLC          C=0 MEANS NO 90 DEGREE ROTATION
+1050 LRUDX2 LDA HGR.DX+1      C=1 MEANS ROTATE 90 DEGREES
+1060        AND #4       IF BIT2=0 THEN DON'T PLOT
+1070        BEQ LRUD4    YES, DO NOT PLOT
+1080        LDA #$7F     NO, LOOK AT WHAT IS ALREADY THERE
+1090        AND MON.HMASK
+1100        AND (MON.GBASL),Y  SCREEN BIT = 1?
+1110        BNE LRUD3          YES, GO CLEAR IT
+1120        INC HGR.COLLISIONS       NO, COUNT THE COLLISION
+1130        LDA #$7F           AND TURN THE BIT ON
+1140        AND MON.HMASK
+1150        BPL LRUD3    ...ALWAYS
+1160 *--------------------------------
+1170 *      "DRAW" ONE BIT
+1180 *--------------------------------
+1190 LRUD1  CLC          C=0 MEANS NO 90 DEGREE ROTATION
+1200 LRUD2  LDA HGR.DX+1      C=1 MEANS ROTATE
+1210        AND #4       IF BIT2=0 THEN DO NOT PLOT
+1220        BEQ LRUD4    DO NOT PLOT
+1230        LDA (MON.GBASL),Y
+1240        EOR HGR.BITS      1'S WHERE ANY BITS NOT IN COLOR
+1250        AND MON.HMASK    LOOK AT JUST THIS BIT POSITION
+1260        BNE LRUD3        THE BIT WAS ZERO, SO PLOT IT
+1270        INC HGR.COLLISIONS  BIT IS ALREADY 1; COUNT COLLSN
+1280 *--------------------------------
+1290 *      TOGGLE BIT ON SCREEN WITH (A)
+1300 *--------------------------------
+1310 LRUD3  EOR (MON.GBASL),Y
+1320        STA (MON.GBASL),Y
+1330 *--------------------------------
+1340 *      DETERMINE WHERE NEXT POINT WILL BE, AND MOVE THERE
+1350 *      C=0 IF NO 90 DEGREE ROTATION
+1360 *      C=1 ROTATES 90 DEGREES
+1370 *--------------------------------
+1380 LRUD4  LDA HGR.DX+1      CALCULATE THE DIRECTION TO MOVE
+1390        ADC HGR.QUADRANT
+1400        AND #3       WRAP AROUND THE CIRCLE
+1410 CON.03 .EQ *-1  (( A CONSTANT ))
+1420 *
+1430 *                   00 -- UP
+1440 *                   01 -- DOWN
+1450 *                   10 -- RIGHT
+1460 *                   11 -- LEFT
+1470 *
+1480        CMP #2       C=0 IF 0 OR 1, C=1 IF 2 OR 3
+1490        ROR          PUT C INTO SIGN, ODD/EVEN INTO C
+1500        BCS MOVE.LEFT.OR.RIGHT
+1510 *--------------------------------
+1520 MOVE.UP.OR.DOWN
+1530        BMI MOVE.DOWN     SIGN FOR UP/DOWN SELECT.
+1540 *--------------------------------
+1550 *      MOVE UP ONE PIXEL
+1560 *      IF ALREADY AT TOP, GO TO BOTTOM
+1570 *
+1580 *      REMEMBER:  Y-COORD   GBASH     GBASL
+1590 *                ABCDEFGH  PPPFGHCD  EABAB000
+1600 *--------------------------------
+1610        CLC          MOVE UP
+1620        LDA MON.GBASH    CALC. BASE ADDRESS OF PREV. LINE
+1630        BIT CON.1C       LOOK AT BITS 000FGH00 IN GBASH
+1640        BNE .5           SIMPLE, JUST FGH=FGH-1
+1650 *                   GBASH=PPP000CD, GBASL=EABAB000
+1660        ASL MON.GBASL   WHAT IS "E"?
+1670        BCS .3          E=1, THEN EFGH=EFGH-1
+1680        BIT CON.03   LOOK AT 000000CD IN GBASH
+1690        BEQ .1       Y-POS IS AB000000 FORM
+1700        ADC #$1F     CD &lt;> 0, SO CDEFGH=CDEFGH-1
+1710        SEC
+1720        BCS .4       ...ALWAYS
+1730 .1     ADC #$23     ENOUGH TO MAKE GBASH=PPP11111 LATER
+1740        PHA          SAVE FOR LATER
+1750        LDA MON.GBASL  GBASL IS NOW ABAB0000 (AB=00,01,10)
+1760        ADC #$B0         0000+1011=1011 AND CARRY CLEAR
+1770 *                    OR 0101+1011=0000 AND CARRY SET
+1780 *                    OR 1010+1011=0101 AND CARRY SET
+1790        BCS .2       NO WRAP-AROUND NEEDED
+1800        ADC #$F0     CHANGE 1011 TO 1010 (WRAP-AROUND)
+1810 .2     STA MON.GBASL   FORM IS NOW STILL ABAB0000
+1820        PLA          PARTIALLY MODIFIED GBASH
+1830        BCS .4       ...ALWAYS
+1840 .3     ADC #$1F
+1850 .4     ROR MON.GBASL    SHIFT IN E, TO GET EABAB000 FORM
+1860 .5     ADC #$FC     FINISH GBASH MODS
+1870 UD.1   STA MON.GBASH
+1880        RTS
+1890 *--------------------------------
+1900        CLC          &lt;&lt;&lt;NEVER USED>>>
+1910 *--------------------------------
+1920 *      MOVE DOWN ONE PIXEL
+1930 *      IF ALREADY AT BOTTOM, GO TO TOP
+1940 *
+1950 *      REMEMBER:  Y-COORD   GBASH     GBASL
+1960 *                ABCDEFGH  PPPFGHCD  EABAB000
+1970 *--------------------------------
+1980 MOVE.DOWN
+1990        LDA MON.GBASH     TRY IT FIRST, BY FGH=FGH+1
+2000        ADC #4            GBASH = PPPFGHCD
+2010 CON.04 .EQ *-1   (( CONSTANT ))
+2020        BIT CON.1C        IS FGH FIELD NOW ZERO?
+2030        BNE UD.1          NO, SO WE ARE FINISHED
+2040 *                        YES, RIPPLE THE CARRY AS HIGH
+2050 *                        AS NECESSARY
+2060        ASL MON.GBASL     LOOK AT "E" BIT
+2070        BCC .2            NOW ZERO; MAKE IT 1 AND LEAVE
+2080        ADC #$E0     CARRY = 1, SO ADDS $E1
+2090        CLC          IS "CD" NOT ZERO?
+2100        BIT CON.04   TESTS BIT 2 FOR CARRY OUT OF "CD"
+2110        BEQ .3       NO CARRY, FINISHED
+2120 *                   INCREMENT "AB" THEN
+2130 *                   0000 --> 0101
+2140 *                   0101 --> 1010
+2150 *                   1010 --> WRAP AROUND TO LINE 0
+2160        LDA MON.GBASL     0000  0101  1010
+2170        ADC #$50          0101  1010  1111
+2180        EOR #$F0          1010  0101  0000
+2190        BEQ .1
+2200        EOR #$F0          0101  1010
+2210 .1     STA MON.GBASL     NEW ABAB0000
+2220        LDA HGR.PAGE     WRAP AROUND TO LINE ZERO OF GROUP
+2230        BCC .3            ...ALWAYS
+2240 .2     ADC #$E0
+2250 .3     ROR MON.GBASL
+2260        BCC UD.1     ...ALWAYS
+2270 *--------------------------------
+2280 *      HLINRL IS NEVER CALLED BY APPLESOFT
+2290 *
+2300 *      ENTER WITH:  (A,X) = DX FROM CURRENT POINT
+2310 *                   (Y)   = DY FROM CURRENT POINT
+2320 *--------------------------------
+2330 HLINRL PHA          SAVE (A)
+2340        LDA #0       CLEAR CURRENT POINT SO HGLIN WILL
+2350        STA HGR.X      ACT RELATIVELY
+2360        STA HGR.X+1
+2370        STA HGR.Y
+2380        PLA          RESTORE (A)
+2390 *--------------------------------
+2400 *      DRAW LINE FROM LAST PLOTTED POINT TO (A,X),(Y)
+2410 *
+2420 *      ENTER WITH:  (A,X) = X OF TARGET POINT
+2430 *                   (Y)   = Y OF TARGET POINT
+2440 *--------------------------------
+2450 HGLIN  PHA          COMPUTE DX = X- X0
+2460        SEC
+2470        SBC HGR.X
+2480        PHA
+2490        TXA
+2500        SBC HGR.X+1
+2510        STA HGR.QUADRANT SAVE DX SIGN (+ = RIGHT, - = LEFT)
+2520        BCS .1       NOW FIND ABS (DX)
+2530        PLA          FORMS 2'S COMPLEMENT
+2540        EOR #$FF
+2550        ADC #1
+2560        PHA
+2570        LDA #0
+2580        SBC HGR.QUADRANT
+2590 .1     STA HGR.DX+1
+2600        STA HGR.E+1       INIT HGR.E TO ABS(X-X0)
+2610        PLA
+2620        STA HGR.DX
+2630        STA HGR.E
+2640        PLA
+2650        STA HGR.X      TARGET X POINT
+2660        STX HGR.X+1
+2670        TYA          TARGET Y POINT
+2680        CLC          COMPUTE DY = Y-HGR.Y
+2690        SBC HGR.Y       AND SAVE -ABS(Y-HGR.Y)-1 IN HGR.DY
+2700        BCC .2       (SO + MEANS UP, - MEANS DOWN)
+2710        EOR #$FF     2'S COMPLEMENT OF DY
+2720        ADC #$FE
+2730 .2     STA HGR.DY
+2740        STY HGR.Y       TARGET Y POINT
+2750        ROR HGR.QUADRANT    SHIFT Y-DIRECTION INTO QUADRANT
+2760        SEC          COUNT = DX -(-DY) = # OF DOTS NEEDED
+2770        SBC HGR.DX
+2780        TAX          COUNTL IS IN X-REG
+2790        LDA #$FF
+2800        SBC HGR.DX+1
+2810        STA HGR.COUNT
+2820        LDY HGR.HORIZ     HORIZONTAL INDEX
+2830        BCS MOVEX2   ...ALWAYS
+2840 *--------------------------------
+2850 *      MOVE LEFT OR RIGHT ONE PIXEL
+2860 *      (A) BIT 6 HAS DIRECTION
+2870 *--------------------------------
+2880 MOVEX  ASL          PUT BIT 6 INTO SIGN POSITION
+2890        JSR MOVE.LEFT.OR.RIGHT
+2900        SEC
+2910 *--------------------------------
+2920 *      DRAW LINE NOW
+2930 *--------------------------------
+2940 MOVEX2 LDA HGR.E       CARRY IS SET
+2950        ADC HGR.DY       E = E-DELTY
+2960        STA HGR.E       NOTE: DY IS (-DELTA Y)-1
+2970        LDA HGR.E+1       CARRY CLR IF HGR.E GOES NEGATIVE
+2980        SBC #0
+2990 .1     STA HGR.E+1
+3000        LDA (MON.GBASL),Y
+3010        EOR HGR.BITS  PLOT A DOT
+3020        AND MON.HMASK
+3030        EOR (MON.GBASL),Y
+3040        STA (MON.GBASL),Y
+3050        INX          FINISHED ALL THE DOTS?
+3060        BNE .2       NO
+3070        INC HGR.COUNT   TEST REST OF COUNT
+3080        BEQ RTS.22   YES, FINISHED.
+3090 .2     LDA HGR.QUADRANT    TEST DIRECTION
+3100        BCS MOVEX    NEXT MOVE IS IN THE X DIRECTION
+3110        JSR MOVE.UP.OR.DOWN    IF CLR, NEG, MOVE
+3120        CLC          E = E+DX
+3130        LDA HGR.E
+3140        ADC HGR.DX
+3150        STA HGR.E
+3160        LDA HGR.E+1
+3170        ADC HGR.DX+1
+3180        BVC .1       ...ALWAYS
+3190 *--------------------------------
+3200 MSKTBL .HS 8182848890A0C0
+3210 *--------------------------------
+3220 CON.1C .HS 1C       MASK FOR "FGH" BITS
+3230 *--------------------------------

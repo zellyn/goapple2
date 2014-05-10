@@ -1,0 +1,368 @@
+1010 *--------------------------------
+1020 *      "CALL" STATEMENT
+1030 *
+1040 *      EFFECTIVELY PERFORMS A "JSR" TO THE SPECIFIED
+1050 *      ADDRESS, WITH THE FOLLOWING REGISTER CONTENTS:
+1060 *           (A,Y) = CALL ADDRESS
+1070 *           (X)   = $9D
+1080 *
+1090 *      THE CALLED ROUTINE CAN RETURN WITH "RTS",
+1100 *      AND APPLESOFT WILL CONTINUE WITH THE NEXT
+1110 *      STATEMENT.
+1120 *--------------------------------
+1130 CALL   JSR FRMNUM   EVALUATE EXPRESSION FOR CALL ADDRESS
+1140        JSR GETADR   CONVERT EXPRESSION TO 16-BIT INTEGER
+1150        JMP (LINNUM)     IN LINNUM, AND JUMP THERE.
+1160 *--------------------------------
+1170 *      "IN#" STATEMENT
+1180 *
+1190 *      NOTE:  NO CHECK FOR VALID SLOT #, AS LONG
+1200 *      AS VALUE IS &lt; 256 IT IS ACCEPTED.
+1210 *      MONITOR MASKS VALUE TO 4 BITS (0-15).
+1220 *--------------------------------
+1230 IN.NUMBER
+1240        JSR GETBYT   GET SLOT NUMBER IN X-REG
+1250        TXA          MONITOR WILL INSTALL IN VECTOR
+1260        JMP MON.INPORT    AT $38,39.
+1270 *--------------------------------
+1280 *      "PR#" STATEMENT
+1290 *
+1300 *      NOTE:  NO CHECK FOR VALID SLOT #, AS LONG
+1310 *      AS VALUE IS &lt; 256 IT IS ACCEPTED.
+1320 *      MONITOR MASKS VALUE TO 4 BITS (0-15).
+1330 *--------------------------------
+1340 PR.NUMBER
+1350        JSR GETBYT   GET SLOT NUMBER IN X-REG
+1360        TXA          MONITOR WILL INSTALL IN VECTOR
+1370        JMP MON.OUTPORT   AT $36,37
+1380 *--------------------------------
+1390 *      GET TWO VALUES &lt; 48, WITH COMMA SEPARATOR
+1400 *
+1410 *      CALLED FOR "PLOT X,Y" 
+1420 *             AND "HLIN A,B AT Y"
+1430 *             AND "VLIN A,B AT X"
+1440 *
+1450 *--------------------------------
+1460 PLOTFNS
+1470        JSR GETBYT   GET FIRST VALUE IN X-REG
+1480        CPX #48      MUST BE &lt; 48
+1490        BCS GOERR    TOO LARGE
+1500        STX FIRST    SAVE FIRST VALUE
+1510        LDA #','     MUST HAVE A COMMA
+1520        JSR SYNCHR
+1530        JSR GETBYT   GET SECOND VALUE IN X-REG
+1540        CPX #48      MUST BE &lt; 48
+1550        BCS GOERR    TOO LARGE
+1560        STX MON.H2   SAVE SECOND VALUE
+1570        STX MON.V2
+1580        RTS          SECOND VALUE STILL IN X-REG
+1590 *--------------------------------
+1600 GOERR  JMP IQERR    ILLEGAL QUANTITY ERROR
+1610 *--------------------------------
+1620 *      GET "A,B AT C" VALUES FOR "HLIN" AND "VLIN"
+1630 *
+1640 *      PUT SMALLER OF (A,B) IN FIRST,
+1650 *      AND LARGER  OF (A,B) IN H2 AND V2.
+1660 *      RETURN WITH (X) = C-VALUE.
+1670 *--------------------------------
+1680 LINCOOR
+1690        JSR PLOTFNS  GET A,B VALUES
+1700        CPX FIRST    IS A &lt; B?
+1710        BCS .1       YES, IN RIGHT ORDER
+1720        LDA FIRST    NO, INTERCHANGE THEM
+1730        STA MON.H2
+1740        STA MON.V2
+1750        STX FIRST
+1760 .1     LDA #TOKEN.AT     MUST HAVE "AT" NEXT
+1770        JSR SYNCHR
+1780        JSR GETBYT   GET C-VALUE IN X-REG
+1790        CPX #48      MUST BE &lt; 48
+1800        BCS GOERR    TOO LARGE
+1810        RTS          C-VALUE IN X-REG
+1820 *--------------------------------
+1830 *      "PLOT" STATEMENT
+1840 *--------------------------------
+1850 PLOT   JSR PLOTFNS  GET X,Y VALUES
+1860        TXA          Y-COORD TO A-REG FOR MONITOR
+1870        LDY FIRST    X-COORD TO Y-YEG FOR MONITOR
+1880        CPY #40      X-COORD MUST BE &lt; 40
+1890        BCS GOERR    X-COORD IS TOO LARGE
+1900        JMP MON.PLOT      PLOT!
+1910 *--------------------------------
+1920 *      "HLIN" STATEMENT
+1930 *--------------------------------
+1940 HLIN   JSR LINCOOR  GET "A,B AT C"
+1950        TXA          Y-COORD IN A-REG
+1960        LDY MON.H2   RIGHT END OF LINE
+1970        CPY #40      MUST BE &lt; 40
+1980        BCS GOERR    TOO LARGE
+1990        LDY FIRST    LEFT END OF LINE IN Y-REG
+2000        JMP MON.HLINE     LET MONITOR DRAW LINE
+2010 *--------------------------------
+2020 *      "VLIN" STATEMENT
+2030 *--------------------------------
+2040 VLIN  JSR LINCOOR   GET "A,B AT C"
+2050        TXA          X-COORD IN Y-REG
+2060        TAY
+2070        CPY #40      X-COORD MUST BE &lt; 40
+2080        BCS GOERR    TOO LARGE
+2090        LDA FIRST    TOP END OF LINE IN A-REG
+2100        JMP MON.VLINE     LET MONITOR DRAW LINE
+2110 *--------------------------------
+2120 *      "COLOR=" STATEMENT
+2130 *--------------------------------
+2140 COLOR  JSR GETBYT   GET COLOR VALUE IN X-REG
+2150        TXA
+2160        JMP MON.SETCOL    LET MONITOR STORE COLOR
+2170 *--------------------------------
+2180 *      "VTAB" STATEMENT
+2190 *--------------------------------
+2200 VTAB   JSR GETBYT   GET LINE # IN X-REG
+2210        DEX          CONVERT TO ZERO BASE
+2220        TXA
+2230        CMP #24      MUST BE 0-23
+2240        BCS GOERR    TOO LARGE, OR WAS "VTAB 0"
+2250        JMP MON.TABV      LET MONITOR COMPUTE BASE
+2260 *--------------------------------
+2270 *      "SPEED=" STATEMENT
+2280 *--------------------------------
+2290 SPEED  JSR GETBYT   GET SPEED SETTING IN X-REG
+2300        TXA          SPEEDZ = $100-SPEED
+2310        EOR #$FF     SO "SPEED=255" IS FASTEST
+2320        TAX
+2330        INX
+2340        STX SPEEDZ
+2350        RTS
+2360 *--------------------------------
+2370 *      "TRACE" STATEMENT
+2380 *      SET SIGN BIT IN TRCFLG
+2390 *--------------------------------
+2400 TRACE SEC
+2410        .HS 90       FAKE BCC TO SKIP NEXT OPCODE
+2420 *--------------------------------
+2430 *      "NOTRACE" STATEMENT
+2440 *      CLEAR SIGN BIT IN TRCFLG
+2450 *--------------------------------
+2460 NOTRACE
+2470        CLC
+2480        ROR TRCFLG   SHIFT CARRY INTO TRCFLG
+2490        RTS
+2500 *--------------------------------
+2510 *      "NORMAL" STATEMENT
+2520 *--------------------------------
+2530 NORMAL LDA #$FF     SET INVFLG = $FF
+2540        BNE N.I.     AND FLASH.BIT = $00
+2550 *--------------------------------
+2560 *      "INVERSE" STATEMENT
+2570 *--------------------------------
+2580 INVERSE
+2590        LDA #$3F     SET INVFLG = $3F
+2600 N.I.   LDX #0       AND FLASH.BIT = $00
+2610 N.I.F. STA MON.INVFLG
+2620        STX FLASH.BIT
+2630        RTS
+2640 *--------------------------------
+2650 *      "FLASH" STATEMENT
+2660 *--------------------------------
+2670 FLASH  LDA #$7F     SET INVFLG = $7F
+2680        LDX #$40     AND FLASH.BIT = $40
+2690        BNE N.I.F.   ...ALWAYS
+2700 *--------------------------------
+2710 *      "HIMEM:" STATEMENT
+2720 *--------------------------------
+2730 HIMEM  JSR FRMNUM   GET VALUE SPECIFIED FOR HIMEM
+2740        JSR GETADR   AS 16-BIT INTEGER
+2750        LDA LINNUM   MUST BE ABOVE VARIABLES AND ARRAYS
+2760        CMP STREND
+2770        LDA LINNUM+1
+2780        SBC STREND+1
+2790        BCS SETHI    IT IS ABOVE THEM
+2800 JMM    JMP MEMERR   NOT ENOUGH MEMORY
+2810 SETHI  LDA LINNUM   STORE NEW HIMEM: VALUE
+2820        STA MEMSIZ
+2830        STA FRETOP   &lt;&lt;&lt;NOTE THAT "HIMEM:" DOES NOT>>>
+2840        LDA LINNUM+1 &lt;&lt;&lt;CLEAR STRING VARIABLES.    >>>
+2850        STA MEMSIZ+1 &lt;&lt;&lt;THIS COULD BE DISASTROUS.  >>>
+2860        STA FRETOP+1
+2870        RTS
+2880 *--------------------------------
+2890 *      "LOMEM:" STATEMENT
+2900 *--------------------------------
+2910 LOMEM  JSR FRMNUM   GET VALUE SPECIFIED FOR LOMEM
+2920        JSR GETADR   AS 16-BIT INTEGER IN LINNUM
+2930        LDA LINNUM   MUST BE BELOW HIMEM
+2940        CMP MEMSIZ
+2950        LDA LINNUM+1
+2960        SBC MEMSIZ+1
+2970        BCS JMM      ABOVE HIMEM, MEMORY ERROR
+2980        LDA LINNUM   MUST BE ABOVE PROGRAM
+2990        CMP VARTAB
+3000        LDA LINNUM+1
+3010        SBC VARTAB+1
+3020        BCC JMM      NOT ABOVE PROGRAM, ERROR
+3030        LDA LINNUM   STORE NEW LOMEM VALUE
+3040        STA VARTAB
+3050        LDA LINNUM+1
+3060        STA VARTAB+1
+3070        JMP CLEARC   LOMEM CLEARS VARIABLES AND ARRAYS
+3080 *--------------------------------
+3090 *      "ON ERR GO TO" STATEMENT
+3100 *--------------------------------
+3110 ONERR  LDA #TOKEN.GOTO   MUST BE "GOTO" NEXT
+3120        JSR SYNCHR
+3130        LDA TXTPTR   SAVE TXTPTR FOR HANDLERR
+3140        STA TXTPSV
+3150        LDA TXTPTR+1
+3160        STA TXTPSV+1
+3170        SEC          SET SIGN BIT OF ERRFLG
+3180        ROR ERRFLG
+3190        LDA CURLIN   SAVE LINE # OF CURRENT LINE
+3200        STA CURLSV
+3210        LDA CURLIN+1
+3220        STA CURLSV+1
+3230        JSR REMN     IGNORE REST OF LINE &lt;&lt;&lt;WHY?>>>
+3240        JMP ADDON    CONTINUE PROGRAM
+3250 *--------------------------------
+3260 *      ROUTINE TO HANDLE ERRORS IF ONERR GOTO ACTIVE
+3270 *--------------------------------
+3280 HANDLERR
+3290        STX ERRNUM   SAVE ERROR CODE NUMBER
+3300        LDX REMSTK   GET STACK PNTR SAVED AT NEWSTT
+3310        STX ERRSTK   REMEMBER IT
+3320 *                   &lt;&lt;&lt;COULD ALSO HAVE DONE TXS  >>>
+3330 *                   &lt;&lt;&lt;HERE; SEE ONERR CORRECTION>>>
+3340 *                   &lt;&lt;&lt;IN APPLESOFT MANUAL.      >>>
+3350        LDA CURLIN   GET LINE # OF OFFENDING STATEMENT
+3360        STA ERRLIN   SO USER CAN SEE IT IF DESIRED
+3370        LDA CURLIN+1
+3380        STA ERRLIN+1
+3390        LDA OLDTEXT  ALSO THE POSITION IN THE LINE
+3400        STA ERRPOS   IN CASE USER WANTS TO "RESUME"
+3410        LDA OLDTEXT+1
+3420        STA ERRPOS+1
+3430        LDA TXTPSV   SET UP TXTPTR TO READ TARGET LINE #
+3440        STA TXTPTR   IN "ON ERR GO TO XXXX"
+3450        LDA TXTPSV+1
+3460        STA TXTPTR+1
+3470        LDA CURLSV
+3480        STA CURLIN   LINE # OF "ON ERR" STATEMENT
+3490        LDA CURLSV+1
+3500        STA CURLIN+1
+3510        JSR CHRGOT   START CONVERSION
+3520        JSR GOTO     GOTO SPECIFIED ONERR LINE
+3530        JMP NEWSTT
+3540 *--------------------------------
+3550 *      "RESUME" STATEMENT
+3560 *--------------------------------
+3570 RESUME LDA ERRLIN   RESTORE LINE # AND TXTPTR
+3580        STA CURLIN   TO RE-TRY OFFENDING LINE
+3590        LDA ERRLIN+1
+3600        STA CURLIN+1
+3610        LDA ERRPOS
+3620        STA TXTPTR
+3630        LDA ERRPOS+1
+3640        STA TXTPTR+1
+3650 *  &lt;&lt;&lt; ONERR CORRECTION IN MANUAL IS EASILY >>>
+3660 *  &lt;&lt;&lt; BY "CALL -3288", WHICH IS $F328 HERE >>>
+3670        LDX ERRSTK   RETRIEVE STACK PNTR AS IT WAS
+3680        TXS          BEFORE STATEMENT SCANNED
+3690        JMP NEWSTT   DO STATEMENT AGAIN
+3700 *--------------------------------
+3710 JSYN   JMP SYNERR
+3720 *--------------------------------
+3730 *      "DEL" STATEMENT
+3740 *--------------------------------
+3750 DEL    BCS JSYN     ERROR IF # NOT SPECIFIED
+3760        LDX PRGEND
+3770        STX VARTAB
+3780        LDX PRGEND+1
+3790        STX VARTAB+1
+3800        JSR LINGET   GET BEGINNING OF RANGE
+3810        JSR FNDLIN   FIND THIS LINE OR NEXT
+3820        LDA LOWTR    UPPER PORTION OF PROGRAM WILL
+3830        STA DEST     BE MOVED DOWN TO HERE
+3840        LDA LOWTR+1
+3850        STA DEST+1
+3860        LDA #','     MUST HAVE A COMMA NEXT
+3870        JSR SYNCHR
+3880        JSR LINGET   GET END RANGE
+3890 *                   (DOES NOTHING IF END RANGE
+3900 *                   IS NOT SPECIFIED)
+3910        INC LINNUM   POINT ONE PAST IT
+3920        BNE .1
+3930        INC LINNUM+1
+3940 .1     JSR FNDLIN   FIND START LINE AFTER SPECIFIED LINE
+3950        LDA LOWTR    WHICH IS BEGINNING OF PORTION
+3960        CMP DEST     TO BE MOVED DOWN
+3970        LDA LOWTR+1  IT MUST BE ABOVE THE TARGET
+3980        SBC DEST+1
+3990        BCS .2       IT IS OKAY
+4000        RTS          NOTHING TO DELETE
+4010 .2     LDY #0       MOVE UPPER PORTION DOWN NOW
+4020 .3     LDA (LOWTR),Y     SOURCE . . .
+4030        STA (DEST),Y      ...TO DESTINATION
+4040        INC LOWTR         BUMP SOURCE PNTR
+4050        BNE .4
+4060        INC LOWTR+1
+4070 .4     INC DEST          BUMP DESTINATION PNTR
+4080        BNE .5
+4090        INC DEST+1
+4100 .5     LDA VARTAB        REACHED END OF PROGRAM YET?
+4110        CMP LOWTR
+4120        LDA VARTAB+1
+4130        SBC LOWTR+1
+4140        BCS .3            NO, KEEP MOVING
+4150        LDX DEST+1        STORE NEW END OF PROGRAM
+4160        LDY DEST          MUST SUBTRACT 1 FIRST
+4170        BNE .6
+4180        DEX
+4190 .6     DEY
+4200        STX VARTAB+1
+4210        STY VARTAB
+4220        JMP FIX.LINKS  RESET LINKS AFTER A DELETE
+4230 *--------------------------------
+4240 *      "GR" STATEMENT
+4250 *--------------------------------
+4260 GR     LDA SW.LORES
+4270        LDA SW.MIXSET
+4280        JMP MON.SETGR
+4290 *--------------------------------
+4300 *      "TEXT" STATEMENT
+4310 *--------------------------------
+4320 TEXT   LDA SW.LOWSCR     JMP $FB36 WOULD HAVE
+4330        JMP MON.SETTXT    DONE BOTH OF THESE
+4340 * &lt;&lt;&lt;       BETTER CODE WOULD BE:   >>>
+4350 * &lt;&lt;&lt;  LDA SW.MIXSET                >>>
+4360 * &lt;&lt;&lt;  JMP $FB33                    >>>
+4370 *--------------------------------
+4380 *      "STORE" STATEMENT
+4390 *--------------------------------
+4400 STORE  JSR GETARYPT GET ADDRESS OF ARRAY TO BE SAVED
+4410        LDY #3       FORWARD OFFSET - 1 IS SIZE OF
+4420        LDA (LOWTR),Y     THIS ARRAY
+4430        TAX
+4440        DEY
+4450        LDA (LOWTR),Y
+4460        SBC #1
+4470        BCS .1
+4480        DEX
+4490 .1     STA LINNUM
+4500        STX LINNUM+1
+4510        JSR MON.WRITE
+4520        JSR TAPEPNT
+4530        JMP MON.WRITE
+4540 *--------------------------------
+4550 *      "RECALL" STATEMENT
+4560 *--------------------------------
+4570 RECALL JSR GETARYPT   FIND ARRAY IN MEMORY
+4580        JSR MON.READ      READ HEADER
+4590        LDY #2         MAKE SURE THE NEW DATA FITS
+4600        LDA (LOWTR),Y
+4610        CMP LINNUM
+4620        INY
+4630        LDA (LOWTR),Y
+4640        SBC LINNUM+1
+4650        BCS .1         IT FITS
+4660        JMP MEMERR     DOESN'T FIT
+4670 .1     JSR TAPEPNT    READ THE DATA
+4680        JMP MON.READ

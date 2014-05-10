@@ -1,0 +1,147 @@
+1010 *--------------------------------
+1020 *      "SCRN(" FUNCTION
+1030 *--------------------------------
+1040 SCREEN JSR CHRGET
+1050        JSR PLOTFNS  GET COLUMN AND ROW
+1060        TXA          ROW
+1070        LDY FIRST    COLUMN
+1080        JSR MON.SCRN GET 4-BIT COLOR THERE
+1090        TAY
+1100        JSR SNGFLT   CONVERT (Y) TO REAL IN FAC
+1110        JMP CHKCLS   REQUIRE ")"
+1120 *--------------------------------
+1130 *      PROCESS UNARY OPERATORS (FUNCTIONS)
+1140 *--------------------------------
+1150 UNARY  CMP #TOKEN.SCRN     NOT UNARY, DO SPECIAL
+1160        BEQ SCREEN
+1170        ASL          DOUBLE TOKEN TO GET INDEX
+1180        PHA
+1190        TAX
+1200        JSR CHRGET
+1210        CPX #TOKEN.LEFTSTR*2-1   LEFT$, RIGHT$, AND MID$
+1220        BCC .1       NOT ONE OF THE STRING FUNCTIONS
+1230        JSR CHKOPN   STRING FUNCTION, NEED "("
+1240        JSR FRMEVL   EVALUATE EXPRESSION FOR STRING
+1250        JSR CHKCOM   REQUIRE A COMMA
+1260        JSR CHKSTR   MAKE SURE EXPRESSION IS A STRING
+1270        PLA
+1280        TAX          RETRIEVE ROUTINE POINTER
+1290        LDA VPNT+1   STACK ADDRESS OF STRING
+1300        PHA
+1310        LDA VPNT
+1320        PHA
+1330        TXA
+1340        PHA          STACK DOUBLED TOKEN
+1350        JSR GETBYT   CONVERT NEXT EXPRESSION TO BYTE IN X-REG
+1360        PLA          GET DOUBLED TOKEN OFF STACK
+1370        TAY          USE AS INDEX TO BRANCH 
+1380        TXA          VALUE OF SECOND PARAMETER
+1390        PHA          PUSH 2ND PARAM
+1400        JMP .2       JOIN UNARY FUNCTIONS
+1410 .1     JSR PARCHK   REQUIRE "(EXPRESSION)"
+1420        PLA
+1430        TAY          INDEX INTO FUNCTION ADDRESS TABLE
+1440 .2     LDA UNFNC-TOKEN.SGN-TOKEN.SGN+$100,Y
+1450        STA JMPADRS+1  PREPARE TO JSR TO ADDRESS
+1460        LDA UNFNC-TOKEN.SGN-TOKEN.SGN+$101,Y
+1470        STA JMPADRS+2
+1480        JSR JMPADRS  DOES NOT RETURN FOR
+1490 *                   CHR$, LEFT$, RIGHT$, OR MID$
+1500        JMP CHKNUM   REQUIRE NUMERIC RESULT
+1510 *--------------------------------
+1520 OR     LDA ARG      "OR" OPERATOR
+1530        ORA FAC      IF RESULT NONZERO, IT IS TRUE
+1540        BNE TRUE
+1550 *--------------------------------
+1560 AND    LDA ARG      "AND" OPERATOR
+1570        BEQ FALSE    IF EITHER IS ZERO, RESULT IS FALSE
+1580        LDA FAC
+1590        BNE TRUE
+1600 *--------------------------------
+1610 FALSE  LDY #0       RETURN FAC=0
+1620        .HS 2C       TRICK
+1630 *--------------------------------
+1640 TRUE   LDY #1       RETURN FAC=1
+1650        JMP SNGFLT
+1660 *--------------------------------
+1670 *      PERFORM RELATIONAL OPERATIONS
+1680 *--------------------------------
+1690 RELOPS JSR CHKVAL   MAKE SURE FAC IS CORRECT TYPE
+1700        BCS STRCMP   TYPE MATCHES, BRANCH IF STRINGS
+1710        LDA ARG.SIGN   NUMERIC COMPARISON
+1720        ORA #$7F     RE-PACK VALUE IN ARG FOR FCOMP
+1730        AND ARG+1
+1740        STA ARG+1
+1750        LDA #ARG
+1760        LDY /ARG
+1770        JSR FCOMP    RETURN A-REG = -1,0,1
+1780        TAX           AS ARG &lt;,=,> FAC
+1790        JMP NUMCMP
+1800 *--------------------------------
+1810 *      STRING COMPARISON
+1820 *--------------------------------
+1830 STRCMP LDA #0       SET RESULT TYPE TO NUMERIC
+1840        STA VALTYP
+1850        DEC CPRTYP   MAKE CPRTYP 0000&lt;=>0
+1860        JSR FREFAC
+1870        STA FAC      STRING LENGTH
+1880        STX FAC+1
+1890        STY FAC+2
+1900        LDA ARG+3
+1910        LDY ARG+4
+1920        JSR FRETMP
+1930        STX ARG+3
+1940        STY ARG+4
+1950        TAX          LEN (ARG) STRING
+1960        SEC
+1970        SBC FAC      SET X TO SMALLER LEN
+1980        BEQ .1
+1990        LDA #1
+2000        BCC .1
+2010        LDX FAC
+2020        LDA #$FF
+2030 .1     STA FAC.SIGN      FLAG WHICH SHORTER
+2040        LDY #$FF
+2050        INX
+2060 STRCMP.1
+2070        INY
+2080        DEX
+2090        BNE STRCMP.2      MORE CHARS IN BOTH STRINGS
+2100        LDX FAC.SIGN   IF = SO FAR, DECIDE BY LENGTH
+2110 *--------------------------------
+2120 NUMCMP BMI CMPDONE
+2130        CLC
+2140        BCC CMPDONE  ...ALWAYS
+2150 *--------------------------------
+2160 STRCMP.2
+2170        LDA (ARG+3),Y
+2180        CMP (FAC+1),Y
+2190        BEQ STRCMP.1      SAME, KEEP COMPARING
+2200        LDX #$FF          IN CASE ARG GREATER
+2210        BCS CMPDONE       IT IS
+2220        LDX #1            FAC GREATER
+2230 *--------------------------------
+2240 CMPDONE
+2250        INX          CONVERT FF,0,1 TO 0,1,2
+2260        TXA
+2270        ROL          AND TO 0,2,4 IF C=0, ELSE 1,2,5
+2280        AND CPRMASK  00000&lt;=>
+2290        BEQ .1       IF NO MATCH: FALSE
+2300        LDA #1       AT LEAST ONE MATCH: TRUE
+2310 .1     JMP FLOAT
+2320 *--------------------------------
+2330 *      "PDL" FUNCTION
+2340 *      &lt;&lt;&lt; NOTE: ARG&lt;4 IS NOT CHECKED >>>
+2350 *--------------------------------
+2360 PDL    JSR CONINT       GET # IN X
+2370        JSR MON.PREAD    READ PADDLE
+2380        JMP SNGFLT       FLOAT RESULT
+2390 *--------------------------------
+2400 *      "DIM" STATEMENT
+2410 *--------------------------------
+2420 NXDIM  JSR CHKCOM   SEPARATED BY COMMAS
+2430 DIM    TAX          NON-ZERO, FLAGS PTRGET DIM CALLED
+2440        JSR PTRGET2  ALLOCATE THE ARRAY
+2450        JSR CHRGOT   NEXT CHAR
+2460        BNE NXDIM    NOT END OF STATEMENT
+2470        RTS

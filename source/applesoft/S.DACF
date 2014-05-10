@@ -1,0 +1,339 @@
+1010 *--------------------------------
+1020 PR.STRING
+1030        JSR STRPRT
+1040        JSR CHRGOT
+1050 *--------------------------------
+1060 *      "PRINT" STATEMENT
+1070 *--------------------------------
+1080 PRINT  BEQ CRDO     NO MORE LIST, PRINT &lt;RETURN>
+1090 *--------------------------------
+1100 PRINT2 BEQ RTS.8    NO MORE LIST, DON'T PRINT &lt;RETURN>
+1110        CMP #TOKEN.TAB
+1120        BEQ PR.TAB.OR.SPC     C=1 FOR TAB(
+1130        CMP #TOKEN.SPC
+1140        CLC
+1150        BEQ PR.TAB.OR.SPC     C=0 FOR SPC(
+1160        CMP #','
+1170        CLC               &lt;&lt;&lt; NO PURPOSE TO THIS >>>
+1180        BEQ PR.COMMA
+1190        CMP #';'
+1200        BEQ PR.NEXT.CHAR
+1210        JSR FRMEVL        EVALUATE EXPRESSION
+1220        BIT VALTYP        STRING OR FP VALUE?
+1230        BMI PR.STRING     STRING
+1240        JSR FOUT          FP: CONVERT INTO BUFFER
+1250        JSR STRLIT            MAKE BUFFER INTO STRING
+1260        JMP PR.STRING         PRINT THE STRING
+1270 *--------------------------------
+1280 CRDO   LDA #$0D     PRINT &lt;RETURN>
+1290        JSR OUTDO
+1300 NEGATE EOR #$FF     &lt;&lt;&lt; WHY??? >>>
+1310 RTS.8  RTS
+1320 *--------------------------------
+1330 *      TAB TO NEXT COMMA COLUMN
+1340 *      &lt;&lt;&lt; NOTE BUG IF WIDTH OF WINDOW LESS THAN 33 >>>
+1350 PR.COMMA
+1360        LDA MON.CH
+1370        CMP #24      &lt;&lt;&lt; BUG:  IT SHOULD BE 32 >>>
+1380        BCC .1       NEXT COLUMN, SAME LINE
+1390        JSR CRDO     FIRST COLUMN, NEXT LINT
+1400        BNE PR.NEXT.CHAR  ...ALWAYS
+1410 .1     ADC #16
+1420        AND #$F0     ROUND TO 16 OR 32
+1430        STA MON.CH
+1440        BCC PR.NEXT.CHAR  ...ALWAYS
+1450 *--------------------------------
+1460 PR.TAB.OR.SPC
+1470        PHP          C=0 FOR SPC(, C=1 FOR TAB(
+1480        JSR GTBYTC   GET VALUE
+1490        CMP #')'     TRAILING PARENTHESIS
+1500        BEQ .1       GOOD
+1510        JMP SYNERR   NO, SYNTAX ERROR
+1520 .1     PLP          TAB( OR SPC(
+1530        BCC .2       SPC(
+1540        DEX          TAB(
+1550        TXA          CALCULATE SPACES NEEDED FOR TAB(
+1560        SBC MON.CH
+1570        BCC PR.NEXT.CHAR  ALREADY PAST THAT COLUMN
+1580        TAX          NOW DO A SPC( TO THE SPECIFIED COLUMN
+1590 .2     INX
+1600 NXSPC  DEX
+1610        BNE DOSPC    MORE SPACES TO PRINT
+1620 *--------------------------------
+1630 PR.NEXT.CHAR
+1640        JSR CHRGET
+1650        JMP PRINT2   CONTINUE PARSING PRINT LIST
+1660 *--------------------------------
+1670 DOSPC  JSR OUTSP
+1680        BNE NXSPC    ...ALWAYS
+1690 *--------------------------------
+1700 *      PRINT STRING AT (Y,A)
+1710 STROUT JSR STRLIT   MAKE (Y,A) PRINTABLE
+1720 *--------------------------------
+1730 *      PRINT STRING AT (FACMO,FACLO)
+1740 *--------------------------------
+1750 STRPRT JSR FREFAC   GET ADDRESS INTO INDEX, (A)=LENGTH
+1760        TAX          USE X-REG FOR COUNTER
+1770        LDY #0       USE Y-REG FOR SCANNER
+1780        INX
+1790 .1     DEX
+1800        BEQ RTS.8    FINISHED
+1810        LDA (INDEX),Y     NEXT CHAR FROM STRING
+1820        JSR OUTDO    PRINT THE CHAR
+1830        INY
+1840 *                   &lt;&lt;&lt; NEXT THREE LINES ARE USELESS >>>
+1850        CMP #$0D     WAS IT &lt;RETURN>?
+1860        BNE .1       NO
+1870        JSR NEGATE   EOR #$FF WOULD DO IT, BUT WHY?
+1880 *                   &lt;&lt;&lt; ABOVE THREE LINES ARE USELESS >>>
+1890        JMP .1
+1900 *--------------------------------
+1910 OUTSP  LDA #' '     PRINT A SPACE
+1920        .HS 2C       SKIP OVER NEXT LINE
+1930 OUTQUES LDA #'?'    PRINT QUESTION MARK
+1940 *--------------------------------
+1950 *      PRINT CHAR FROM (A)
+1960 *
+1970 *      NOTE: POKE 243,32 ($20 IN $F3) WILL CONVERT
+1980 *      OUTPUT TO LOWER CASE.  THIS CAN BE CANCELLED
+1990 *      BY NORMAL, INVERSE, OR FLASH OR POKE 243,0.
+2000 *--------------------------------
+2010 OUTDO  ORA #$80     PRINT (A)
+2020        CMP #$A0     CONTROL CHR?
+2030        BCC .1       SKIP IF SO
+2040        ORA FLASH.BIT   =$40 FOR FLASH, ELSE $00
+2050 .1     JSR MON.COUT "AND"S WITH $3F (INVERSE), $7F (FLASH)
+2060        AND #$7F
+2070        PHA
+2080        LDA SPEEDZ   COMPLEMENT OF SPEED #
+2090        JSR MON.WAIT   SO SPEED=255 BECOMES (A)=1
+2100        PLA
+2110        RTS
+2120 *--------------------------------
+2130 *      INPUT CONVERSION ERROR:  ILLEGAL CHARACTER
+2140 *      IN NUMERIC FIELD.  MUST DISTINGUISH
+2150 *      BETWEEN INPUT, READ, AND GET
+2160 *--------------------------------
+2170 INPUTERR
+2180        LDA INPUTFLG
+2190        BEQ RESPERR  TAKEN IF INPUT
+2200        BMI READERR  TAKEN IF READ
+2210        LDY #$FF     FROM A GET
+2220        BNE ERLIN    ...ALWAYS
+2230 *--------------------------------
+2240 READERR
+2250        LDA DATLIN   TELL WHERE THE "DATA" IS, RATHER
+2260        LDY DATLIN+1    THAN THE "READ"
+2270 *--------------------------------
+2280 ERLIN  STA CURLIN
+2290        STY CURLIN+1
+2300        JMP SYNERR
+2310 *--------------------------------
+2320 INPERR PLA
+2330 *--------------------------------
+2340 RESPERR
+2350        BIT ERRFLG   "ON ERR" TURNED ON?
+2360        BPL .1       NO, GIVE REENTRY A TRY
+2370        LDX #254     ERROR CODE = 254
+2380        JMP HANDLERR
+2390 .1     LDA #ERR.REENTRY "?REENTER"
+2400        LDY /ERR.REENTRY
+2410        JSR STROUT
+2420        LDA OLDTEXT  RE-EXECUTE THE WHOLE INPUT STATEMENT
+2430        LDY OLDTEXT+1
+2440        STA TXTPTR
+2450        STY TXTPTR+1
+2460        RTS
+2470 *--------------------------------
+2480 *      "GET" STATEMENT
+2490 *--------------------------------
+2500 GET    JSR ERRDIR   ILLEGAL IF IN DIRECT MODE
+2510        LDX #INPUT.BUFFER+1    SIMULATE INPUT
+2520        LDY /INPUT.BUFFER+1
+2530        LDA #0
+2540        STA INPUT.BUFFER+1
+2550        LDA #$40     SET UP INPUTFLG
+2560        JSR PROCESS.INPUT.LIST  &lt;&lt;&lt; CAN SAVE 1 BYTE HERE>>>
+2570        RTS               &lt;&lt;&lt;BY "JMP PROCESS.INPUT.LIST">>>
+2580 *--------------------------------
+2590 *      "INPUT" STATEMENT
+2600 *--------------------------------
+2610 INPUT  CMP #'"'     CHECK FOR OPTIONAL PROMPT STRING
+2620        BNE .1       NO, PRINT "?" PROMPT
+2630        JSR STRTXT   MAKE A PRINTABLE STRING OUT OF IT
+2640        LDA #';'     MUST HAVE ; NOW
+2650        JSR SYNCHR
+2660        JSR STRPRT   PRINT THE STRING
+2670        JMP .2
+2680 .1     JSR OUTQUES  NO STRING, PRINT "?"
+2690 .2     JSR ERRDIR   ILLEGAL IF IN DIRECT MODE
+2700        LDA #','     PRIME THE BUFFER
+2710        STA INPUT.BUFFER-1
+2720        JSR INLIN
+2730        LDA INPUT.BUFFER
+2740        CMP #$03     CONTROL C?
+2750        BNE INPUT.FLAG.ZERO   NO
+2760        JMP CONTROL.C.TYPED
+2770 *--------------------------------
+2780 NXIN   JSR OUTQUES  PRINT "?"
+2790        JMP INLIN
+2800 *--------------------------------
+2810 *      "READ" STATEMENT
+2820 *--------------------------------
+2830 READ   LDX DATPTR   Y,X POINTS AT NEXT DATA STATEMENT
+2840        LDY DATPTR+1
+2850        LDA #$98     SET INPUTFLG = $98
+2860        .HS 2C       TRICK TO PROCESS.INPUT.LIST
+2870 *--------------------------------
+2880 INPUT.FLAG.ZERO
+2890        LDA #0       SET INPUTFLG = $00
+2900 *--------------------------------
+2910 *      PROCESS INPUT LIST
+2920 *
+2930 *      (Y,X) IS ADDRESS OF INPUT DATA STRING
+2940 *      (A) = VALUE FOR INPUTFLG:  $00 FOR INPUT
+2950 *                                 $40 FOR GET
+2960 *                                 $98 FOR READ
+2970 *--------------------------------
+2980 PROCESS.INPUT.LIST
+2990        STA INPUTFLG
+3000        STX INPTR    ADDRESS OF INPUT STRING
+3010        STY INPTR+1
+3020 *--------------------------------
+3030 PROCESS.INPUT.ITEM
+3040        JSR PTRGET   GET ADDRESS OF VARIABLE
+3050        STA FORPNT
+3060        STY FORPNT+1
+3070        LDA TXTPTR   SAVE CURRENT TXTPTR,
+3080        LDY TXTPTR+1      WHICH POINTS INTO PROGRAM
+3090        STA TXPSV
+3100        STY TXPSV+1
+3110        LDX INPTR    SET TXTPTR TO POINT AT INPUT BUFFER
+3120        LDY INPTR+1       OR "DATA" LINE
+3130        STX TXTPTR
+3140        STY TXTPTR+1
+3150        JSR CHRGOT   GET CHAR AT PNTR
+3160        BNE INSTART  NOT END OF LINE OR COLON
+3170        BIT INPUTFLG      DOING A "GET"?
+3180        BVC .1            NO
+3190        JSR MON.RDKEY     YES, GET CHAR
+3200        AND #$7F
+3210        STA INPUT.BUFFER
+3220        LDX #INPUT.BUFFER-1
+3230        LDY /INPUT.BUFFER-1
+3240        BNE .2       ...ALWAYS
+3250 *--------------------------------
+3260 .1     BMI FINDATA  DOING A "READ"
+3270        JSR OUTQUES  DOING AN "INPUT", PRINT "?"
+3280        JSR NXIN     PRINT ANOTHER "?", AND INPUT A LINE
+3290 .2     STX TXTPTR
+3300        STY TXTPTR+1
+3310 *--------------------------------
+3320 INSTART
+3330        JSR CHRGET   GET NEXT INPUT CHAR
+3340        BIT VALTYP   STRING OR NUMERIC?
+3350        BPL .5       NUMERIC
+3360        BIT INPUTFLG STRING -- NOW WHAT INPUT TYPE?
+3370        BVC .1       NOT A "GET"
+3380        INX          "GET"
+3390        STX TXTPTR
+3400        LDA #0
+3410        STA CHARAC   NO OTHER TERMINATORS THAN $00
+3420        BEQ .2       ...ALWAYS
+3430 *--------------------------------
+3440 .1     STA CHARAC
+3450        CMP #'"'     TERMINATE ON $00 OR QUOTE
+3460        BEQ .3
+3470        LDA #':'     TERMINATE ON $00, COLON, OR COMMA
+3480        STA CHARAC
+3490        LDA #','
+3500 .2     CLC
+3510 .3     STA ENDCHR
+3520        LDA TXTPTR
+3530        LDY TXTPTR+1
+3540        ADC #0       SKIP OVER QUOTATION MARK, IF
+3550        BCC .4           THERE WAS ONE
+3560        INY
+3570 .4     JSR STRLT2   BUILD STRING STARTING AT (Y,A)
+3580 *                TERMINATED BY $00, (CHARAC), OR (ENDCHR)
+3590        JSR POINT    SET TXTPTR TO POINT AT STRING
+3600        JSR PUTSTR   STORE STRING IN VARIABLE
+3610        JMP INPUT.MORE
+3620 *--------------------------------
+3630 .5     PHA
+3640        LDA INPUT.BUFFER  ANYTHING IN BUFFER?
+3650        BEQ INPFIN        NO, SEE IF READ OR INPUT
+3660 *--------------------------------
+3670 INPUT.DATA
+3680        PLA               "READ"
+3690        JSR FIN      GET FP NUMBER AT TXTPTR
+3700        LDA VALTYP+1
+3710        JSR LET2     STORE RESULT IN VARIABLE
+3720 *--------------------------------
+3730 INPUT.MORE
+3740        JSR CHRGOT
+3750        BEQ .1       END OF LINE OR COLON
+3760        CMP #','     COMMA IN INPUT?
+3770        BEQ .1       YES
+3780        JMP INPUTERR  NOTHING ELSE WILL DO
+3790 .1     LDA TXTPTR   SAVE POSITION IN INPUT BUFFER
+3800        LDY TXTPTR+1
+3810        STA INPTR
+3820        STY INPTR+1
+3830        LDA TXPSV    RESTORE PROGRAM POINTER
+3840        LDY TXPSV+1
+3850        STA TXTPTR
+3860        STY TXTPTR+1
+3870        JSR CHRGOT   NEXT CHAR FROM PROGRAM
+3880        BEQ INPDONE  END OF STATEMENT
+3890        JSR CHKCOM   BETTER BE A COMMA THEN
+3900        JMP PROCESS.INPUT.ITEM
+3910 *--------------------------------
+3920 INPFIN LDA INPUTFLG      "INPUT" OR "READ"
+3930        BNE INPUT.DATA    "READ"
+3940        JMP INPERR
+3950 *--------------------------------
+3960 FINDATA
+3970        JSR DATAN    GET OFFSET TO NEXT COLON OR EOL
+3980        INY          TO FIRST CHAR OF NEXT LINE
+3990        TAX          WHICH:  EOL OR COLON?
+4000        BNE .1       COLON
+4010        LDX #ERR.NODATA   EOL: MIGHT BE OUT OF DATA
+4020        INY          CHECK HI-BYTE OF FORWARD PNTR
+4030        LDA (TXTPTR),Y  END OF PROGRAM?
+4040        BEQ GERR     YES, WE ARE OUT OF DATA
+4050        INY          PICK UP THE LINE #
+4060        LDA (TXTPTR),Y
+4070        STA DATLIN
+4080        INY
+4090        LDA (TXTPTR),Y
+4100        INY          POINT AT FIRST TEXT CHAR IN LINE
+4110        STA DATLIN+1
+4120 .1     LDA (TXTPTR),Y  GET 1ST TOKEN OF STATEMENT
+4130        TAX          SAVE TOKEN IN X-REG
+4140        JSR ADDON    ADD (Y) TO TXTPTR
+4150        CPX #TOKEN.DATA   DID WE FIND A "DATA" STATEMENT?
+4160        BNE FINDATA       NOT YET
+4170        JMP INSTART       YES, READ IT
+4180 *---NO MORE INPUT REQUESTED------
+4190 INPDONE
+4200        LDA INPTR    GET POINTER IN CASE IT WAS "READ"
+4210        LDY INPTR+1
+4220        LDX INPUTFLG      "READ" OR "INPUT"?
+4230        BPL .1            "INPUT"
+4240        JMP SETDA         "DATA", SO STORE (Y,X) AT DATPTR
+4250 .1     LDY #0       "INPUT":  ANY MORE CHARS ON LINE?
+4260        LDA (INPTR),Y
+4270        BEQ .2           NO, ALL IS WELL
+4280        LDA #ERR.EXTRA   YES, ERROR
+4290        LDY /ERR.EXTRA   "EXTRA IGNORED"
+4300        JMP STROUT
+4310 .2     RTS
+4320 *--------------------------------
+4330 ERR.EXTRA
+4340        .AS '?EXTRA IGNORED'
+4350        .HS 0D00
+4360 ERR.REENTRY
+4370        .AS '?REENTER'
+4380        .HS 0D00
+4390 *--------------------------------

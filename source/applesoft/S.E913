@@ -1,0 +1,396 @@
+1010 *--------------------------------
+1020 CON.ONE .HS 8100000000
+1030 *--------------------------------
+1040 POLY.LOG     .DA #3      # OF COEFFICIENTS - 1
+1050              .HS 7F5E56CB79 * X^7 +
+1060              .HS 80139B0B64 * X^5 +
+1070              .HS 8076389316 * X^3 +
+1080              .HS 8238AA3B20 * X
+1090 *--------------------------------
+1100 CON.SQR.HALF .HS 803504F334
+1110 CON.SQR.TWO  .HS 813504F334
+1120 CON.NEG.HALF .HS 8080000000
+1130 CON.LOG.TWO  .HS 80317217F8
+1140 *--------------------------------
+1150 *      "LOG" FUNCTION
+1160 *--------------------------------
+1170 LOG    JSR SIGN     GET -1,0,+1 IN A-REG FOR FAC
+1180        BEQ GIQ      LOG (0) IS ILLEGAL
+1190        BPL LOG.2    >0 IS OK
+1200 GIQ    JMP IQERR    &lt;= 0 IS NO GOOD
+1210 LOG.2  LDA FAC      FIRST GET LOG BASE 2
+1220        SBC #$7F     SAVE UNBIASED EXPONENT
+1230        PHA
+1240        LDA #$80     NORMALIZE BETWEEN .5 AND 1
+1250        STA FAC
+1260        LDA #CON.SQR.HALF
+1270        LDY /CON.SQR.HALF
+1280        JSR FADD     COMPUTE VIA SERIES OF ODD
+1290        LDA #CON.SQR.TWO   POWERS OF
+1300        LDY /CON.SQR.TWO   (SQR(2)X-1)/(SQR(2)X+1)
+1310        JSR FDIV
+1320        LDA #CON.ONE
+1330        LDY /CON.ONE
+1340        JSR FSUB
+1350        LDA #POLY.LOG
+1360        LDY /POLY.LOG
+1370        JSR POLYNOMIAL.ODD
+1380        LDA #CON.NEG.HALF
+1390        LDY /CON.NEG.HALF
+1400        JSR FADD
+1410        PLA
+1420        JSR ADDACC   ADD ORIGINAL EXPONENT
+1430        LDA #CON.LOG.TWO  MULTIPLY BY LOG(2) TO FORM
+1440        LDY /CON.LOG.TWO  NATURAL LOG OF X
+1450 *--------------------------------
+1460 *      FAC = (Y,A) * FAC
+1470 *--------------------------------
+1480 FMULT  JSR LOAD.ARG.FROM.YA
+1490 *--------------------------------
+1500 *      FAC = ARG * FAC
+1510 *--------------------------------
+1520 FMULTT BNE .1       FAC .NE. ZERO
+1530        JMP RTS.13   FAC = 0 * ARG = 0
+1540 *  &lt;&lt;&lt; WHY IS LINE ABOVE JUST "RTS"? >>>
+1550 *--------------------------------
+1560 *
+1570 *--------------------------------
+1580 .1     JSR ADD.EXPONENTS
+1590        LDA #0
+1600        STA RESULT   INIT PRODUCT = 0
+1610        STA RESULT+1
+1620        STA RESULT+2
+1630        STA RESULT+3
+1640        LDA FAC.EXTENSION
+1650        JSR MULTIPLY.1
+1660        LDA FAC+4
+1670        JSR MULTIPLY.1
+1680        LDA FAC+3
+1690        JSR MULTIPLY.1
+1700        LDA FAC+2
+1710        JSR MULTIPLY.1
+1720        LDA FAC+1
+1730        JSR MULTIPLY.2
+1740        JMP COPY.RESULT.INTO.FAC
+1750 *--------------------------------
+1760 *      MULTIPLY ARG BY (A) INTO RESULT
+1770 *--------------------------------
+1780 MULTIPLY.1
+1790        BNE MULTIPLY.2    THIS BYTE NON-ZERO
+1800        JMP SHIFT.RIGHT.1 (A)=0, JUST SHIFT ARG RIGHT 8
+1810 *--------------------------------
+1820 MULTIPLY.2
+1830        LSR               SHIFT BIT INTO CARRY
+1840        ORA #$80          SUPPLY SENTINEL BIT
+1850 .1     TAY               REMAINING MULTIPLIER TO Y
+1860        BCC .2            THIS MULTIPLIER BIT = 0
+1870        CLC               = 1, SO ADD ARG TO RESULT
+1880        LDA RESULT+3
+1890        ADC ARG+4
+1900        STA RESULT+3
+1910        LDA RESULT+2
+1920        ADC ARG+3
+1930        STA RESULT+2 
+1940        LDA RESULT+1
+1950        ADC ARG+2
+1960        STA RESULT+1
+1970        LDA RESULT
+1980        ADC ARG+1
+1990        STA RESULT
+2000 .2     ROR RESULT        SHIFT RESULT RIGHT 1
+2010        ROR RESULT+1
+2020        ROR RESULT+2
+2030        ROR RESULT+3
+2040        ROR FAC.EXTENSION
+2050        TYA               REMAINING MULTIPLIER
+2060        LSR               LSB INTO CARRY
+2070        BNE .1            IF SENTINEL STILL HERE, MULTIPLY
+2080 RTS.13 RTS               8 X 32 COMPLETED
+2090 *--------------------------------
+2100 *      UNPACK NUMBER AT (Y,A) INTO ARG
+2110 *--------------------------------
+2120 LOAD.ARG.FROM.YA
+2130        STA INDEX    USE INDEX FOR PNTR
+2140        STY INDEX+1
+2150        LDY #4       FIVE BYTES TO MOVE
+2160        LDA (INDEX),Y
+2170        STA ARG+4
+2180        DEY
+2190        LDA (INDEX),Y
+2200        STA ARG+3
+2210        DEY
+2220        LDA (INDEX),Y
+2230        STA ARG+2
+2240        DEY
+2250        LDA (INDEX),Y
+2260        STA ARG.SIGN
+2270        EOR FAC.SIGN SET COMBINED SIGN FOR MULT/DIV
+2280        STA SGNCPR
+2290        LDA ARG.SIGN TURN ON NORMALIZED INVISIBLE BIT
+2300        ORA #$80     TO COMPLETE MANTISSA
+2310        STA ARG+1
+2320        DEY
+2330        LDA (INDEX),Y
+2340        STA ARG      EXPONENT
+2350        LDA FAC      SET STATUS BITS ON FAC EXPONENT
+2360        RTS
+2370 *--------------------------------
+2380 *      ADD EXPONENTS OF ARG AND FAC
+2390 *      (CALLED BY FMULT AND FDIV)
+2400 *
+2410 *      ALSO CHECK FOR OVERFLOW, AND SET RESULT SIGN
+2420 *--------------------------------
+2430 ADD.EXPONENTS
+2440        LDA ARG
+2450 *--------------------------------
+2460 ADD.EXPONENTS.1
+2470        BEQ ZERO     IF ARG=0, RESULT IS ZERO
+2480        CLC
+2490        ADC FAC
+2500        BCC .1       IN RANGE
+2510        BMI JOV      OVERFLOW
+2520        CLC
+2530        .HS 2C       TRICK TO SKIP
+2540 .1     BPL ZERO     OVERFLOW
+2550        ADC #$80     RE-BIAS
+2560        STA FAC      RESULT
+2570        BNE .2
+2580        JMP STA.IN.FAC.SIGN  RESULT IS ZERO
+2590 *  &lt;&lt;&lt; CRAZY TO JUMP WAY BACK THERE! >>>
+2600 *  &lt;&lt;&lt; SAME IDENTICAL CODE IS BELOW! >>>
+2610 *  &lt;&lt;&lt; INSTEAD OF BNE .2, JMP STA.IN.FAC.SIGN   >>>
+2620 *  &lt;&lt;&lt; ONLY NEEDED BEQ .3            >>>
+2630 .2     LDA SGNCPR   SET SIGN OF RESULT
+2640 .3     STA FAC.SIGN
+2650        RTS
+2660 *--------------------------------
+2670 * IF (FAC) IS POSITIVE, GIVE "OVERFLOW" ERROR
+2680 * IF (FAC) IS NEGATIVE, SET FAC=0, POP ONE RETURN, AND RTS
+2690 * CALLED FROM "EXP" FUNCTION
+2700 *--------------------------------
+2710 OUTOFRNG
+2720        LDA FAC.SIGN
+2730        EOR #$FF
+2740        BMI JOV      ERROR IF POSITIVE #
+2750 *--------------------------------
+2760 *      POP RETURN ADDRESS AND SET FAC=0
+2770 *--------------------------------
+2780 ZERO   PLA
+2790        PLA
+2800        JMP ZERO.FAC
+2810 *--------------------------------
+2820 JOV    JMP OVERFLOW
+2830 *--------------------------------
+2840 *      MULTIPLY FAC BY 10
+2850 *--------------------------------
+2860 MUL10  JSR COPY.FAC.TO.ARG.ROUNDED
+2870        TAX          TEXT FAC EXPONENT
+2880        BEQ .1       FINISHED IF FAC=0
+2890        CLC
+2900        ADC #2       ADD 2 TO EXPONENT GIVES (FAC)*4
+2910        BCS JOV      OVERFLOW
+2920        LDX #0
+2930        STX SGNCPR
+2940        JSR FADD.2   MAKES (FAC)*5
+2950        INC FAC      *2, MAKES (FAC)*10
+2960        BEQ JOV      OVERFLOW
+2970 .1     RTS
+2980 *--------------------------------
+2990 CON.TEN .HS 8420000000
+3000 *--------------------------------
+3010 *      DIVIDE FAC BY 10
+3020 *--------------------------------
+3030 DIV10  JSR COPY.FAC.TO.ARG.ROUNDED
+3040        LDA #CON.TEN   SET UP TO PUT
+3050        LDY /CON.TEN   10 IN FAC
+3060        LDX #0
+3070 *--------------------------------
+3080 *      FAC = ARG / (Y,A)
+3090 *--------------------------------
+3100 DIV    STX SGNCPR
+3110        JSR LOAD.FAC.FROM.YA
+3120        JMP FDIVT    DIVIDE ARG BY FAC
+3130 *--------------------------------
+3140 *      FAC = (Y,A) / FAC
+3150 *--------------------------------
+3160 FDIV   JSR LOAD.ARG.FROM.YA
+3170 *--------------------------------
+3180 *      FAC = ARG / FAC
+3190 *--------------------------------
+3200 FDIVT  BEQ .8       FAC = 0, DIVIDE BY ZERO ERROR
+3210        JSR ROUND.FAC
+3220        LDA #0       NEGATE FAC EXPONENT, SO 
+3230        SEC          ADD.EXPONENTS FORMS DIFFERENCE
+3240        SBC FAC
+3250        STA FAC
+3260        JSR ADD.EXPONENTS
+3270        INC FAC
+3280        BEQ JOV      OVERFLOW
+3290        LDX #-4      INDEX FOR RESULT
+3300        LDA #1       SENTINEL
+3310 .1     LDY ARG+1    SEE IF FAC CAN BE SUBTRACTED
+3320        CPY FAC+1
+3330        BNE .2
+3340        LDY ARG+2
+3350        CPY FAC+2
+3360        BNE .2
+3370        LDY ARG+3
+3380        CPY FAC+3
+3390        BNE .2
+3400        LDY ARG+4
+3410        CPY FAC+4
+3420 .2     PHP          SAVE THE ANSWER, AND ALSO ROLL THE
+3430        ROL          BIT INTO THE QUOTIENT, SENTINEL OUT
+3440        BCC .3       NO SENTINEL, STILL NOT 8 TRIPS
+3450        INX          8 TRIPS, STORE BYTE OF QUOTIENT
+3460        STA RESULT+3,X
+3470        BEQ .6       32-BITS COMPLETED
+3480        BPL .7       FINAL EXIT WHEN X=1
+3490        LDA #1       RE-START SENTINEL
+3500 .3     PLP          GET ANSWER, CAN FAC BE SUBTRACTED?
+3510        BCS .5       YES, DO IT
+3520 .4     ASL ARG+4    NO, SHIFT ARG LEFT
+3530        ROL ARG+3
+3540        ROL ARG+2
+3550        ROL ARG+1
+3560        BCS .2       ANOTHER TRIP
+3570        BMI .1       HAVE TO COMPARE FIRST
+3580        BPL .2       ...ALWAYS
+3590 .5     TAY          SAVE QUOTIENT/SENTINEL BYTE
+3600        LDA ARG+4    SUBTRACT FAC FROM ARG ONCE
+3610        SBC FAC+4
+3620        STA ARG+4
+3630        LDA ARG+3
+3640        SBC FAC+3
+3650        STA ARG+3
+3660        LDA ARG+2
+3670        SBC FAC+2
+3680        STA ARG+2
+3690        LDA ARG+1
+3700        SBC FAC+1
+3710        STA ARG+1
+3720        TYA          RESTORE QUOTIENT/SENTINEL BYTE
+3730        JMP .4       GO TO SHIFT ARG AND CONTINUE
+3740 *--------------------------------
+3750 .6     LDA #$40     DO A FEW EXTENSION BITS
+3760        BNE .3       ...ALWAYS
+3770 *--------------------------------
+3780 .7     ASL          LEFT JUSTIFY THE EXTENSION BITS WE DID
+3790        ASL
+3800        ASL
+3810        ASL
+3820        ASL
+3830        ASL
+3840        STA FAC.EXTENSION
+3850        PLP
+3860        JMP COPY.RESULT.INTO.FAC
+3870 *--------------------------------
+3880 .8     LDX #ERR.ZERODIV
+3890        JMP ERROR
+3900 *--------------------------------
+3910 *      COPY RESULT INTO FAC MANTISSA, AND NORMALIZE
+3920 *--------------------------------
+3930 COPY.RESULT.INTO.FAC
+3940        LDA RESULT
+3950        STA FAC+1
+3960        LDA RESULT+1
+3970        STA FAC+2
+3980        LDA RESULT+2
+3990        STA FAC+3
+4000        LDA RESULT+3
+4010        STA FAC+4
+4020        JMP NORMALIZE.FAC.2
+4030 *--------------------------------
+4040 *      UNPACK (Y,A) INTO FAC
+4050 *--------------------------------
+4060 LOAD.FAC.FROM.YA
+4070        STA INDEX    USE INDEX FOR PNTR
+4080        STY INDEX+1
+4090        LDY #4       PICK UP 5 BYTES
+4100        LDA (INDEX),Y
+4110        STA FAC+4
+4120        DEY
+4130        LDA (INDEX),Y
+4140        STA FAC+3
+4150        DEY
+4160        LDA (INDEX),Y
+4170        STA FAC+2
+4180        DEY
+4190        LDA (INDEX),Y
+4200        STA FAC.SIGN FIRST BIT IS SIGN
+4210        ORA #$80     SET NORMALIZED INVISIBLE BIT
+4220        STA FAC+1
+4230        DEY
+4240        LDA (INDEX),Y
+4250        STA FAC      EXPONENT
+4260        STY FAC.EXTENSION  Y=0
+4270        RTS
+4280 *--------------------------------
+4290 *      ROUND FAC, STORE IN TEMP2
+4300 *--------------------------------
+4310 STORE.FAC.IN.TEMP2.ROUNDED
+4320        LDX #TEMP2   PACK FAC INTO TEMP2
+4330        .HS 2C       TRICK TO BRANCH
+4340 *--------------------------------
+4350 *      ROUND FAC, STORE IN TEMP1
+4360 *--------------------------------
+4370 STORE.FAC.IN.TEMP1.ROUNDED
+4380        LDX #TEMP1   PACK FAC INTO TEMP1
+4390        LDY /TEMP1   HI-BYTE OF TEMP1 SAME AS TEMP2
+4400        BEQ STORE.FAC.AT.YX.ROUNDED    ...ALWAYS
+4410 *--------------------------------
+4420 *      ROUND FAC, AND STORE WHERE FORPNT POINTS
+4430 *--------------------------------
+4440 SETFOR LDX FORPNT
+4450        LDY FORPNT+1
+4460 *--------------------------------
+4470 *      ROUND FAC, AND STORE AT (Y,X)
+4480 *--------------------------------
+4490 STORE.FAC.AT.YX.ROUNDED
+4500        JSR ROUND.FAC    ROUND VALUE IN FAC USING EXTENSION
+4510        STX INDEX         USE INDEX FOR PNTR
+4520        STY INDEX+1
+4530        LDY #4            STORING 5 PACKED BYTES
+4540        LDA FAC+4
+4550        STA (INDEX),Y
+4560        DEY
+4570        LDA FAC+3
+4580        STA (INDEX),Y
+4590        DEY
+4600        LDA FAC+2
+4610        STA (INDEX),Y
+4620        DEY
+4630        LDA FAC.SIGN      PACK SIGN IN TOP BIT OF MANTISSA
+4640        ORA #$7F
+4650        AND FAC+1
+4660        STA (INDEX),Y
+4670        DEY
+4680        LDA FAC           EXPONENT
+4690        STA (INDEX),Y
+4700        STY FAC.EXTENSION ZERO THE EXTENSION
+4710        RTS
+4720 *--------------------------------
+4730 *      COPY ARG INTO FAC
+4740 *--------------------------------
+4750 COPY.ARG.TO.FAC
+4760        LDA ARG.SIGN      COPY SIGN
+4770 MFA    STA FAC.SIGN
+4780        LDX #5            MOVE 5 BYTES
+4790 .1     LDA ARG-1,X
+4800        STA FAC-1,X
+4810        DEX
+4820        BNE .1
+4830        STX FAC.EXTENSION ZERO EXTENSION
+4840        RTS
+4850 *--------------------------------
+4860 *      ROUND FAC AND COPY TO ARG
+4870 *--------------------------------
+4880 COPY.FAC.TO.ARG.ROUNDED
+4890        JSR ROUND.FAC     ROUND FAC USING EXTENSION
+4900 MAF    LDX #6            COPY 6 BYTES, INCLUDES SIGN
+4910 .1     LDA FAC-1,X
+4920        STA ARG-1,X
+4930        DEX
+4940        BNE .1
+4950        STX FAC.EXTENSION ZERO FAC EXTENSION
+4960 RTS.14 RTS

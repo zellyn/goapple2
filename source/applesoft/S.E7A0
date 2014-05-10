@@ -1,0 +1,268 @@
+1010 *--------------------------------
+1020 *      ADD 0.5 TO FAC
+1030 *--------------------------------
+1040 FADDH  LDA #CON.HALF     FAC+1/2 -> FAC
+1050        LDY /CON.HALF
+1060        JMP FADD
+1070 *--------------------------------
+1080 *      FAC = (Y,A) - FAC
+1090 *--------------------------------
+1100 FSUB   JSR LOAD.ARG.FROM.YA
+1110 *--------------------------------
+1120 *      FAC = ARG - FAC
+1130 *--------------------------------
+1140 FSUBT  LDA FAC.SIGN   COMPLEMENT FAC AND ADD
+1150        EOR #$FF
+1160        STA FAC.SIGN
+1170        EOR ARG.SIGN   FIX SGNCPR TOO
+1180        STA SGNCPR
+1190        LDA FAC        MAKE STATUS SHOW FAC EXPONENT
+1200        JMP FADDT      JOIN FADD
+1210 *--------------------------------
+1220 *      SHIFT SMALLER ARGUMENT MORE THAN 7 BITS
+1230 *--------------------------------
+1240 FADD.1 JSR SHIFT.RIGHT   ALIGN RADIX BY SHIFTING
+1250        BCC FADD.3   ...ALWAYS
+1260 *--------------------------------
+1270 *      FAC = (Y,A) + FAC
+1280 *--------------------------------
+1290 FADD   JSR LOAD.ARG.FROM.YA
+1300 *--------------------------------
+1310 *      FAC = ARG + FAC
+1320 *--------------------------------
+1330 FADDT  BNE .1       FAC IS NON-ZERO
+1340        JMP COPY.ARG.TO.FAC   FAC = 0 + ARG
+1350 .1     LDX FAC.EXTENSION
+1360        STX ARG.EXTENSION
+1370        LDX #ARG     SET UP TO SHIFT ARG
+1380        LDA ARG      EXPONENT
+1390 *--------------------------------
+1400 FADD.2 TAY
+1410        BEQ RTS.10   IF ARG=0, WE ARE FINISHED
+1420        SEC
+1430        SBC FAC      GET DIFFNCE OF EXP
+1440        BEQ FADD.3   GO ADD IF SAME EXP
+1450        BCC .1       ARG HAS SMALLER EXPONENT
+1460        STY FAC      EXP HAS SMALLER EXPONENT
+1470        LDY ARG.SIGN
+1480        STY FAC.SIGN
+1490        EOR #$FF     COMPLEMENT SHIFT COUNT
+1500        ADC #0       CARRY WAS SET
+1510        LDY #0
+1520        STY ARG.EXTENSION
+1530        LDX #FAC     SET UP TO SHIFT FAC
+1540        BNE .2       ...ALWAYS
+1550 .1     LDY #0
+1560        STY FAC.EXTENSION
+1570 .2     CMP #$F9     SHIFT MORE THAN 7 BITS?
+1580        BMI FADD.1      YES
+1590        TAY          INDEX TO # OF SHIFTS
+1600        LDA FAC.EXTENSION
+1610        LSR 1,X      START SHIFTING...
+1620        JSR SHIFT.RIGHT.4  ...COMPLETE SHIFTING
+1630 FADD.3 BIT SGNCPR   DO FAC AND ARG HAVE SAME SIGNS?
+1640        BPL FADD.4   YES, ADD THE MANTISSAS
+1650        LDY #FAC     NO, SUBTRACT SMALLER FROM LARGER
+1660        CPX #ARG     WHICH WAS ADJUSTED?
+1670        BEQ .1       IF ARG, DO FAC-ARG
+1680        LDY #ARG     IF FAC, DO ARG-FAC
+1690 .1     SEC          SUBTRACT SMALLER FROM LARGER (WE HOPE)
+1700        EOR #$FF     (IF EXPONENTS WERE EQUAL, WE MIGHT BE
+1710        ADC ARG.EXTENSION  SUBTRACTING LARGER FROM SMALLER)
+1720        STA FAC.EXTENSION
+1730        LDA 4,Y
+1740        SBC 4,X
+1750        STA FAC+4
+1760        LDA 3,Y
+1770        SBC 3,X
+1780        STA FAC+3
+1790        LDA 2,Y
+1800        SBC 2,X
+1810        STA FAC+2
+1820        LDA 1,Y
+1830        SBC 1,X
+1840        STA FAC+1
+1850 *--------------------------------
+1860 *      NORMALIZE VALUE IN FAC
+1870 *--------------------------------
+1880 NORMALIZE.FAC.1
+1890        BCS NORMALIZE.FAC.2
+1900        JSR COMPLEMENT.FAC
+1910 *--------------------------------
+1920 NORMALIZE.FAC.2
+1930        LDY #0       SHIFT UP SIGNIF DIGIT
+1940        TYA          START A=0, COUNT SHIFTS IN A-REG
+1950        CLC
+1960 .1     LDX FAC+1    LOOK AT MOST SIGNIFICANT BYTE
+1970        BNE NORMALIZE.FAC.4   SOME 1-BITS HERE
+1980        LDX FAC+2    HI-BYTE OF MANTISSA STILL ZERO,
+1990        STX FAC+1         SO DO A FAST 8-BIT SHUFFLE
+2000        LDX FAC+3
+2010        STX FAC+2
+2020        LDX FAC+4
+2030        STX FAC+3
+2040        LDX FAC.EXTENSION
+2050        STX FAC+4
+2060        STY FAC.EXTENSION  ZERO EXTENSION BYTE
+2070        ADC #8       BUMP SHIFT COUNT
+2080        CMP #32      DONE 4 TIMES YET?
+2090        BNE .1       NO, STILL MIGHT BE SOME 1'S
+2100 *                   YES, VALUE OF FAC IS ZERO
+2110 *--------------------------------
+2120 *      SET FAC = 0
+2130 *      (ONLY NECESSARY TO ZERO EXPONENT AND SIGN CELLS)
+2140 *--------------------------------
+2150 ZERO.FAC
+2160        LDA #0
+2170 *--------------------------------
+2180 STA.IN.FAC.SIGN.AND.EXP
+2190        STA FAC
+2200 *--------------------------------
+2210 STA.IN.FAC.SIGN
+2220        STA FAC.SIGN
+2230        RTS
+2240 *--------------------------------
+2250 *      ADD MANTISSAS OF FAC AND ARG INTO FAC
+2260 *--------------------------------
+2270 FADD.4 ADC ARG.EXTENSION
+2280        STA FAC.EXTENSION
+2290        LDA FAC+4
+2300        ADC ARG+4
+2310        STA FAC+4
+2320        LDA FAC+3
+2330        ADC ARG+3
+2340        STA FAC+3
+2350        LDA FAC+2
+2360        ADC ARG+2
+2370        STA FAC+2
+2380        LDA FAC+1
+2390        ADC ARG+1
+2400        STA FAC+1
+2410        JMP NORMALIZE.FAC.5
+2420 *--------------------------------
+2430 *      FINISH NORMALIZING FAC
+2440 *--------------------------------
+2450 NORMALIZE.FAC.3
+2460        ADC #1       COUNT BITS SHIFTED
+2470        ASL FAC.EXTENSION
+2480        ROL FAC+4
+2490        ROL FAC+3
+2500        ROL FAC+2
+2510        ROL FAC+1
+2520 *--------------------------------
+2530 NORMALIZE.FAC.4
+2540        BPL NORMALIZE.FAC.3    UNTIL TOP BIT = 1
+2550        SEC
+2560        SBC FAC      ADJUST EXPONENT BY BITS SHIFTED
+2570        BCS ZERO.FAC UNDERFLOW, RETURN ZERO
+2580        EOR #$FF
+2590        ADC #1       2'S COMPLEMENT
+2600        STA FAC      CARRY=0 NOW
+2610 *--------------------------------
+2620 NORMALIZE.FAC.5
+2630        BCC RTS.11   UNLESS MANTISSA CARRIED
+2640 *--------------------------------
+2650 NORMALIZE.FAC.6
+2660        INC FAC      MANTISSA CARRIED, SO SHIFT RIGHT
+2670        BEQ OVERFLOW      OVERFLOW IF EXPONENT TOO BIG
+2680        ROR FAC+1
+2690        ROR FAC+2
+2700        ROR FAC+3
+2710        ROR FAC+4
+2720        ROR FAC.EXTENSION
+2730 RTS.11 RTS
+2740 *--------------------------------
+2750 *      2'S COMPLEMENT OF FAC
+2760 *--------------------------------
+2770 COMPLEMENT.FAC
+2780        LDA FAC.SIGN
+2790        EOR #$FF
+2800        STA FAC.SIGN
+2810 *--------------------------------
+2820 *      2'S COMPLEMENT OF FAC MANTISSA ONLY
+2830 *--------------------------------
+2840 COMPLEMENT.FAC.MANTISSA
+2850        LDA FAC+1
+2860        EOR #$FF
+2870        STA FAC+1
+2880        LDA FAC+2
+2890        EOR #$FF
+2900        STA FAC+2
+2910        LDA FAC+3
+2920        EOR #$FF
+2930        STA FAC+3
+2940        LDA FAC+4
+2950        EOR #$FF
+2960        STA FAC+4
+2970        LDA FAC.EXTENSION
+2980        EOR #$FF
+2990        STA FAC.EXTENSION
+3000        INC FAC.EXTENSION START INCREMENTING MANTISSA
+3010        BNE RTS.12
+3020 *--------------------------------
+3030 *      INCREMENT FAC MANTISSA
+3040 *--------------------------------
+3050 INCREMENT.FAC.MANTISSA
+3060        INC FAC+4   ADD CARRY FROM EXTRA
+3070        BNE RTS.12
+3080        INC FAC+3
+3090        BNE RTS.12
+3100        INC FAC+2
+3110        BNE RTS.12
+3120        INC FAC+1
+3130 RTS.12 RTS
+3140 *--------------------------------
+3150 OVERFLOW
+3160        LDX #ERR.OVERFLOW
+3170        JMP ERROR
+3180 *--------------------------------
+3190 *      SHIFT 1,X THRU 5,X RIGHT
+3200 *      (A) = NEGATIVE OF SHIFT COUNT
+3210 *      (X) = POINTER TO BYTES TO BE SHIFTED
+3220 *
+3230 *      RETURN WITH (Y)=0, CARRY=0, EXTENSION BITS IN A-REG
+3240 *--------------------------------
+3250 SHIFT.RIGHT.1
+3260        LDX #RESULT-1     SHIFT RESULT RIGHT
+3270 SHIFT.RIGHT.2
+3280        LDY 4,X           SHIFT 8 BITS RIGHT
+3290        STY FAC.EXTENSION
+3300        LDY 3,X
+3310        STY 4,X
+3320        LDY 2,X
+3330        STY 3,X
+3340        LDY 1,X
+3350        STY 2,X
+3360        LDY SHIFT.SIGN.EXT   $00 IF +, $FF IF -
+3370        STY 1,X
+3380 *--------------------------------
+3390 *      MAIN ENTRY TO RIGHT SHIFT SUBROUTINE
+3400 *--------------------------------
+3410 SHIFT.RIGHT
+3420        ADC #8
+3430        BMI SHIFT.RIGHT.2 STILL MORE THAN 8 BITS TO GO
+3440        BEQ SHIFT.RIGHT.2 EXACTLY 8 MORE BITS TO GO
+3450        SBC #8            UNDO ADC ABOVE
+3460        TAY               REMAINING SHIFT COUNT
+3470        LDA FAC.EXTENSION
+3480        BCS SHIFT.RIGHT.5 FINISHED SHIFTING
+3490 SHIFT.RIGHT.3
+3500 L      ASL 1,X           SIGN -> CARRY (SIGN EXTENSION)
+3510        BCC .1            SIGN +
+3520        INC 1,X           PUT SIGN IN LSB
+3530 .1     ROR 1,X          RESTORE VALUE, SIGN STILL IN CARRY
+3540        ROR 1,X           START RIGHT SHIFT, INSERTING SIGN
+3550 *--------------------------------
+3560 *      ENTER HERE FOR SHORT SHIFTS WITH NO SIGN EXTENSION
+3570 *--------------------------------
+3580 SHIFT.RIGHT.4
+3590        ROR 2,X
+3600        ROR 3,X
+3610        ROR 4,X
+3620        ROR               EXTENSION
+3630        INY               COUNT THE SHIFT
+3640        BNE SHIFT.RIGHT.3
+3650 SHIFT.RIGHT.5
+3660        CLC               RETURN WITH CARRY CLEAR
+3670        RTS
+3680 *--------------------------------

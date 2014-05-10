@@ -1,0 +1,382 @@
+1010 *--------------------------------
+1020 *      CONCATENATE TWO STRINGS
+1030 *--------------------------------
+1040 CAT    LDA FAC+4    SAVE ADDRESS OF FIRST DESCRIPTOR
+1050        PHA
+1060        LDA FAC+3
+1070        PHA
+1080        JSR FRM.ELEMENT   GET SECOND STRING ELEMENT
+1090        JSR CHKSTR        MUST BE A STRING
+1100        PLA               RECOVER ADDRES OF 1ST DESCRIPTOR
+1110        STA STRNG1
+1120        PLA
+1130        STA STRNG1+1
+1140        LDY #0
+1150        LDA (STRNG1),Y   ADD LENGTHS, GET CONCATENATED SIZE
+1160        CLC
+1170        ADC (FAC+3),Y
+1180        BCC .1            OK IF &lt; $100
+1190        LDX #ERR.STRLONG
+1200        JMP ERROR
+1210 .1     JSR STRINI   GET SPACE FOR CONCATENATED STRINGS
+1220        JSR MOVINS   MOVE 1ST STRING
+1230        LDA DSCPTR
+1240        LDY DSCPTR+1
+1250        JSR FRETMP
+1260        JSR MOVSTR.1 MOVE 2ND STRING
+1270        LDA STRNG1
+1280        LDY STRNG1+1
+1290        JSR FRETMP
+1300        JSR PUTNEW   SET UP DESCRIPTOR
+1310        JMP FRMEVL.2 FINISH EXPRESSION
+1320 *--------------------------------
+1330 *      GET STRING DESCRIPTOR POINTED AT BY (STRNG1)
+1340 *      AND MOVE DESCRIBED STRING TO (FRESPC)
+1350 *--------------------------------
+1360 MOVINS LDY #0
+1370        LDA (STRNG1),Y
+1380        PHA          LENGTH
+1390        INY
+1400        LDA (STRNG1),Y
+1410        TAX          PUT STRING POINTER IN X,Y
+1420        INY
+1430        LDA (STRNG1),Y
+1440        TAY
+1450        PLA          RETRIEVE LENGTH
+1460 *--------------------------------
+1470 *      MOVE STRING AT (Y,X) WITH LENGTH (A)
+1480 *      TO DESTINATION WHOSE ADDRESS IS IN FRESPC,FRESPC+1
+1490 *--------------------------------
+1500 MOVSTR STX INDEX    PUT POINTER IN INDEX
+1510        STY INDEX+1
+1520 MOVSTR.1
+1530        TAY          LENGTH TO Y-REG
+1540        BEQ .2       IF LENGTH IS ZERO, FINISHED
+1550        PHA          SAVE LENGTH ON STACK
+1560 .1     DEY          MOVE BYTES FROM (INDEX) TO (FRESPC)
+1570        LDA (INDEX),Y
+1580        STA (FRESPC),Y
+1590        TYA          TEST IF ANY LEFT TO MOVE
+1600        BNE .1       YES, KEEP MOVING
+1610        PLA          NO, FINISHED.  GET LENGTH
+1620 .2     CLC          AND ADD TO FRESPC, SO
+1630        ADC FRESPC   FRESPC POINTS TO NEXT HIGHER
+1640        STA FRESPC   BYTE.  (USED BY CONCATENATION)
+1650        BCC .3
+1660        INC FRESPC+1
+1670 .3     RTS
+1680 *--------------------------------
+1690 *      IF (FAC) IS A TEMPORARY STRING, RELEASE DESCRIPTOR
+1700 *--------------------------------
+1710 FRESTR JSR CHKSTR   LAST RESULT A STRING?
+1720 *--------------------------------
+1730 *      IF STRING DESCRIPTOR POINTED TO BY FAC+3,4 IS
+1740 *      A TEMPORARY STRING, RELEASE IT.
+1750 *--------------------------------
+1760 FREFAC LDA FAC+3    GET DESCRIPTOR POINTER
+1770        LDY FAC+4
+1780 *--------------------------------
+1790 *      IF STRING DESCRIPTOR WHOSE ADDRESS IS IN Y,A IS
+1800 *      A TEMPORARY STRING, RELEASE IT.
+1810 *--------------------------------
+1820 FRETMP STA INDEX    SAVE THE ADDRESS OF THE DESCRIPTOR
+1830        STY INDEX+1
+1840        JSR FRETMS   FREE DESCRIPTOR IF IT IS TEMPORARY
+1850        PHP          REMEMBER IF TEMP
+1860        LDY #0       POINT AT LENGTH OF STRING
+1870        LDA (INDEX),Y
+1880        PHA          SAVE LENGTH ON STACK
+1890        INY
+1900        LDA (INDEX),Y
+1910        TAX          GET ADDRESS OF STRING IN Y,X
+1920        INY
+1930        LDA (INDEX),Y
+1940        TAY
+1950        PLA          LENGTH IN A
+1960        PLP          RETRIEVE STATUS, Z=1 IF TEMP
+1970        BNE .2       NOT A TEMPORARY STRING
+1980        CPY FRETOP+1      IS IT THE LOWEST STRING?
+1990        BNE .2            NO
+2000        CPX FRETOP
+2010        BNE .2            NO
+2020        PHA               YES, PUSH LENGTH AGAIN
+2030        CLC               RECOVER THE SPACE USED BY
+2040        ADC FRETOP        THE STRING
+2050        STA FRETOP
+2060        BCC .1
+2070        INC FRETOP+1
+2080 .1     PLA          RETRIEVE LENGTH AGAIN
+2090 .2     STX INDEX    ADDRESS OF STRING IN Y,X
+2100        STY INDEX+1  LENGTH OF STRING IN A-REG
+2110        RTS
+2120 *--------------------------------
+2130 *      RELEASE TEMPORARY DESCRIPTOR IF Y,A = LASTPT
+2140 *--------------------------------
+2150 FRETMS CPY LASTPT+1      COMPARE Y,A TO LATEST TEMP
+2160        BNE .1            NOT SAME ONE, CANNOT RELEASE
+2170        CMP LASTPT
+2180        BNE .1            NOT SAME ONE, CANNOT RELEASE
+2190        STA TEMPPT        UPDATE TEMPT FOR NEXT TEMP
+2200        SBC #3            BACK OFF LASTPT 
+2210        STA LASTPT
+2220        LDY #0            NOW Y,A POINTS TO TOP TEMP
+2230 .1     RTS          Z=0 IF NOT TEMP, Z=1 IF TEMP
+2240 *--------------------------------
+2250 *      "CHR$" FUNCTION
+2260 *--------------------------------
+2270 CHRSTR JSR CONINT   CONVERT ARGUMENT TO BYTE IN X
+2280        TXA
+2290        PHA          SAVE IT
+2300        LDA #1       GET SPACE FOR STRING OF LENGTH 1
+2310        JSR STRSPA
+2320        PLA          RECALL THE CHARACTER
+2330        LDY #0       PUT IN STRING
+2340        STA (FAC+1),Y
+2350        PLA          POP RETURN ADDRESS
+2360        PLA
+2370        JMP PUTNEW   MAKE IT A TEMPORARY STRING
+2380 *--------------------------------
+2390 *      "LEFT$" FUNCTION
+2400 *--------------------------------
+2410 LEFTSTR
+2420        JSR SUBSTRING.SETUP
+2430        CMP (DSCPTR),Y    COMPARE 1ST PARAMETER TO LENGTH
+2440        TYA               Y=A=0
+2450 SUBSTRING.1
+2460        BCC .1            1ST PARAMETER SMALLER, USE IT
+2470        LDA (DSCPTR),Y    1ST IS LONGER, USE STRING LENGTH
+2480        TAX               IN X-REG
+2490        TYA               Y=A=0 AGAIN
+2500 .1     PHA               PUSH LEFT END OF SUBSTRING
+2510 SUBSTRING.2
+2520        TXA
+2530 SUBSTRING.3
+2540        PHA               PUSH LENGTH OF SUBSTRING
+2550        JSR STRSPA        MAKE ROOM FOR STRING OF (A) BYTES
+2560        LDA DSCPTR        RELEASE PARAMETER STRING IF TEMP
+2570        LDY DSCPTR+1
+2580        JSR FRETMP
+2590        PLA               GET LENGTH OF SUBSTRING
+2600        TAY               IN Y-REG
+2610        PLA               GET LEFT END OF SUBSTRING
+2620        CLC               ADD TO POINTER TO STRING
+2630        ADC INDEX
+2640        STA INDEX
+2650        BCC .1
+2660        INC INDEX+1
+2670 .1     TYA               LENGTH
+2680        JSR MOVSTR.1      COPY STRING INTO SPACE
+2690        JMP PUTNEW        ADD TO TEMPS
+2700 *--------------------------------
+2710 *      "RIGHT$" FUNCTION
+2720 *--------------------------------
+2730 RIGHTSTR
+2740        JSR SUBSTRING.SETUP
+2750        CLC          COMPUTE LENGTH-WIDTH OF SUBSTRING
+2760        SBC (DSCPTR),Y    TO GET STARTING POINT IN STRING
+2770        EOR #$FF
+2780        JMP SUBSTRING.1   JOIN LEFT$
+2790 *--------------------------------
+2800 *      "MID$" FUNCTION
+2810 *--------------------------------
+2820 MIDSTR LDA #$FF     FLAG WHETHER 2ND PARAMETER
+2830        STA FAC+4
+2840        JSR CHRGOT   SEE IF ")" YET
+2850        CMP #')'
+2860        BEQ .1       YES, NO 2ND PARAMETER
+2870        JSR CHKCOM   NO, MUST HAVE COMMA
+2880        JSR GETBYT   GET 2ND PARAM IN X-REG
+2890 .1     JSR SUBSTRING.SETUP
+2900        DEX          1ST PARAMETER - 1
+2910        TXA
+2920        PHA
+2930        CLC
+2940        LDX #0
+2950        SBC (DSCPTR),Y
+2960        BCS SUBSTRING.2
+2970        EOR #$FF
+2980        CMP FAC+4    USE SMALLER OF TWO
+2990        BCC SUBSTRING.3
+3000        LDA FAC+4
+3010        BCS SUBSTRING.3   ...ALWAYS
+3020 *--------------------------------
+3030 *      COMMON SETUP ROUTINE FOR LEFT$, RIGHT$, MID$:
+3040 *      REQUIRE ")"; POP RETURN ADRS, GET DESCRIPTOR
+3050 *      ADDRESS, GET 1ST PARAMETER OF COMMAND
+3060 *--------------------------------
+3070 SUBSTRING.SETUP
+3080        JSR CHKCLS   REQUIRE ")"
+3090        PLA          SAVE RETURN ADDRESS
+3100        TAY          IN Y-REG AND LENGTH
+3110        PLA
+3120        STA LENGTH
+3130        PLA          POP PREVIOUS RETURN ADDRESS
+3140        PLA           (FROM GOROUT).
+3150        PLA          RETRIEVE 1ST PARAMETER
+3160        TAX
+3170        PLA          GET ADDRESS OF STRING DESCRIPTOR
+3180        STA DSCPTR
+3190        PLA
+3200        STA DSCPTR+1
+3210        LDA LENGTH   RESTORE RETURN ADDRESS
+3220        PHA
+3230        TYA
+3240        PHA
+3250        LDY #0
+3260        TXA          GET 1ST PARAMETER IN A-REG
+3270        BEQ GOIQ     ERROR IF 0
+3280        RTS
+3290 *--------------------------------
+3300 *      "LEN" FUNCTION
+3310 *--------------------------------
+3320 LEN    JSR GETSTR   GET LENTGH IN Y-REG, MAKE FAC NUMERIC
+3330        JMP SNGFLT   FLOAT Y-REG INTO FAC
+3340 *--------------------------------
+3350 *      IF LAST RESULT IS A TEMPORARY STRING, FREE IT
+3360 *      MAKE VALTYP NUMERIC, RETURN LENGTH IN Y-REG
+3370 *--------------------------------
+3380 GETSTR JSR FRESTR   IF LAST RESULT IS A STRING, FREE IT
+3390        LDX #0       MAKE VALTYP NUMERIC
+3400        STX VALTYP
+3410        TAY          LENGTH OF STRING TO Y-REG
+3420        RTS
+3430 *--------------------------------
+3440 *      "ASC" FUNCTION
+3450 *--------------------------------
+3460 ASC    JSR GETSTR   GET STRING, GET LENGTH IN Y-REG
+3470        BEQ GOIQ     ERROR IF LENGTH 0
+3480        LDY #0
+3490        LDA (INDEX),Y     GET 1ST CHAR OF STRING
+3500        TAY
+3510        JMP SNGFLT        FLOAT Y-REG INTO FAC
+3520 *--------------------------------
+3530 GOIQ   JMP IQERR    ILLEGAL QUANTITY ERROR
+3540 *--------------------------------
+3550 *      SCAN TO NEXT CHARACTER AND CONVERT EXPRESSION
+3560 *      TO SINGLE BYTE IN X-REG
+3570 *--------------------------------
+3580 GTBYTC JSR CHRGET
+3590 *--------------------------------
+3600 *      EVALUATE EXPRESSION AT TXTPTR, AND
+3610 *      CONVERT IT TO SINGLE BYTE IN X-REG
+3620 *--------------------------------
+3630 GETBYT JSR FRMNUM
+3640 *--------------------------------
+3650 *      CONVERT (FAC) TO SINGLE BYTE INTEGER IN X-REG
+3660 *--------------------------------
+3670 CONINT JSR MKINT    CONVERT IF IN RANGE -32767 TO +32767
+3680        LDX FAC+3    HI-BYTE MUST BE ZERO
+3690        BNE GOIQ     VALUE > 255, ERROR
+3700        LDX FAC+4    VALUE IN X-REG
+3710        JMP CHRGOT   GET NEXT CHAR IN A-REG
+3720 *--------------------------------
+3730 *      "VAL" FUNCTION
+3740 *--------------------------------
+3750 VAL    JSR GETSTR   GET POINTER TO STRING IN INDEX
+3760        BNE .1       LENGTH NON-ZERO
+3770        JMP ZERO.FAC      RETURN 0 IF LENGTH=0
+3780 .1     LDX TXTPTR   SAVE CURRENT TXTPTR
+3790        LDY TXTPTR+1
+3800        STX STRNG2
+3810        STY STRNG2+1
+3820        LDX INDEX
+3830        STX TXTPTR   POINT TXTPTR TO START OF STRING
+3840        CLC
+3850        ADC INDEX    ADD LENGTH
+3860        STA DEST     POINT DEST TO END OF STRING + 1
+3870        LDX INDEX+1
+3880        STX TXTPTR+1
+3890        BCC .2
+3900        INX
+3910 .2     STX DEST+1
+3920        LDY #0       SAVE BYTE THAT FOLLOWS STRING
+3930        LDA (DEST),Y      ON STACK
+3940        PHA
+3950        LDA #0            AND STORE $00 IN ITS PLACE
+3960        STA (DEST),Y
+3970 *  &lt;&lt;&lt; THAT CAUSES A BUG IF HIMEM = $BFFF, >>>
+3980 *  &lt;&lt;&lt; BECAUSE STORING $00 AT $C000 IS NO  >>>
+3990 *  &lt;&lt;&lt; USE; $C000 WILL ALWAYS BE LAST CHAR >>>
+4000 *  &lt;&lt;&lt; TYPED, SO FIN WON'T TERMINATE UNTIL >>>
+4010 *  &lt;&lt;&lt; IT SEES A ZERO AT $C010!            >>>
+4020        JSR CHRGOT   PRIME THE PUMP
+4030        JSR FIN      EVALUATE STRING
+4040        PLA          GET BYTE THAT SHOULD FOLLOW STRING
+4050        LDY #0       AND PUT IT BACK
+4060        STA (DEST),Y
+4070 *                   RESTORE TXTPTR
+4080 *--------------------------------
+4090 *      COPY STRNG2 INTO TXTPTR
+4100 *--------------------------------
+4110 POINT  LDX STRNG2
+4120        LDY STRNG2+1
+4130        STX TXTPTR
+4140        STY TXTPTR+1
+4150        RTS
+4160 *--------------------------------
+4170 *      EVALUATE "EXP1,EXP2"
+4180 *
+4190 *      CONVERT EXP1 TO 16-BIT NUMBER IN LINNUM
+4200 *      CONVERT EXP2 TO 8-BIT NUMBER IN X-REG
+4210 *--------------------------------
+4220 GTNUM  JSR FRMNUM
+4230        JSR GETADR
+4240 *--------------------------------
+4250 *      EVALUATE ",EXPRESSION"
+4260 *      CONVERT EXPRESSION TO SINGLE BYTE IN X-REG
+4270 *--------------------------------
+4280 COMBYTE
+4290        JSR CHKCOM   MUST HAVE COMMA FIRST
+4300        JMP GETBYT   CONVERT EXPRESSION TO BYTE IN X-REG
+4310 *--------------------------------
+4320 *      CONVERT (FAC) TO A 16-BIT VALUE IN LINNUM
+4330 *--------------------------------
+4340 GETADR LDA FAC      FAC &lt; 2^16?
+4350        CMP #$91
+4360        BCS GOIQ     NO, ILLEGAL QUANTITY
+4370        JSR QINT     CONVERT TO INTEGER
+4380        LDA FAC+3    COPY IT INTO LINNUM
+4390        LDY FAC+4
+4400        STY LINNUM    TO LINNUM
+4410        STA LINNUM+1
+4420        RTS
+4430 *--------------------------------
+4440 *      "PEEK" FUNCTION
+4450 *--------------------------------
+4460 PEEK   LDA LINNUM   SAVE (LINNUM) ON STACK DURING PEEK
+4470        PHA
+4480        LDA LINNUM+1
+4490        PHA
+4500        JSR GETADR   GET ADDRESS PEEKING AT
+4510        LDY #0
+4520        LDA (LINNUM),Y    TAKE A QUICK LOOK
+4530        TAY               VALUE IN Y-REG
+4540        PLA          RESTORE LINNUM FROM STACK
+4550        STA LINNUM+1
+4560        PLA
+4570        STA LINNUM
+4580        JMP SNGFLT   FLOAT Y-REG INTO FAC
+4590 *--------------------------------
+4600 *      "POKE" STATEMENT
+4610 *--------------------------------
+4620 POKE   JSR GTNUM    GET THE ADDRESS AND VALUE
+4630        TXA               VALUE IN A,
+4640        LDY #0
+4650        STA (LINNUM),Y    STORE IT AWAY,
+4660        RTS               AND THAT'S ALL FOR TODAY
+4670 *--------------------------------
+4680 *      "WAIT" STATEMENT
+4690 *--------------------------------
+4700 WAIT   JSR GTNUM    GET ADDRESS IN LINNUM, MASK IN X
+4710        STX FORPNT   SAVE MASK
+4720        LDX #0
+4730        JSR CHRGOT   ANOTHER PARAMETER?
+4740        BEQ .1       NO, USE $00 FOR EXCLUSIVE-OR
+4750        JSR COMBYTE  GET XOR-MASK
+4760 .1     STX FORPNT+1 SAVE XOR-MASK HERE
+4770        LDY #0
+4780 .2     LDA (LINNUM),Y  GET BYTE AT ADDRESS
+4790        EOR FORPNT+1    INVERT SPECIFIED BITS
+4800        AND FORPNT      SELECT SPECIFIED BITS
+4810        BEQ .2          LOOP TILL NOT 0
+4820 RTS.10 RTS

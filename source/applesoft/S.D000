@@ -1,0 +1,258 @@
+1010 *--------------------------------
+1020 *   APPLESOFT TOKENS
+1030 *--------------------------------
+1040 TOKEN.FOR        .EQ $81
+1050 TOKEN.DATA       .EQ $83
+1060 TOKEN.POP        .EQ $A1
+1070 TOKEN.GOTO       .EQ $AB
+1080 TOKEN.GOSUB      .EQ $B0
+1090 TOKEN.REM        .EQ $B2
+1100 TOKEN.PRINT      .EQ $BA
+1110 TOKEN.TAB        .EQ $C0
+1120 TOKEN.TO         .EQ $C1
+1130 TOKEN.FN         .EQ $C2
+1140 TOKEN.SPC        .EQ $C3
+1150 TOKEN.THEN       .EQ $C4
+1160 TOKEN.AT         .EQ $C5
+1170 TOKEN.NOT        .EQ $C6
+1180 TOKEN.STEP       .EQ $C7
+1190 TOKEN.PLUS       .EQ $C8
+1200 TOKEN.MINUS      .EQ $C9
+1210 TOKEN.GREATER    .EQ $CF
+1220 TOKEN.EQUAL      .EQ $D0
+1230 TOKEN.SGN        .EQ $D2
+1240 TOKEN.SCRN       .EQ $D7
+1250 TOKEN.LEFTSTR    .EQ $E8
+1260 *--------------------------------
+1270 *      BRANCH TABLE FOR TOKENS
+1280 *--------------------------------
+1290 TOKEN.ADDRESS.TABLE
+1300    .DA END-1        $80...128...END
+1310    .DA FOR-1        $81...129...FOR
+1320    .DA NEXT-1       $82...130...NEXT
+1330    .DA DATA-1       $83...131...DATA
+1340    .DA INPUT-1      $84...132...INPUT
+1350    .DA DEL-1        $85...133...DEL
+1360    .DA DIM-1        $86...134...DIM
+1370    .DA READ-1       $87...135...READ
+1380    .DA GR-1         $88...136...GR
+1390    .DA TEXT-1       $89...137...TEXT
+1400    .DA PR.NUMBER-1  $8A...138...PR#
+1410    .DA IN.NUMBER-1  $8B...139...IN#
+1420    .DA CALL-1       $8C...140...CALL
+1430    .DA PLOT-1       $8D...141...PLOT
+1440    .DA HLIN-1       $8E...142...HLIN
+1450    .DA VLIN-1       $8F...143...VLIN
+1460    .DA HGR2-1       $90...144...HGR2
+1470    .DA HGR-1        $91...145...HGR
+1480    .DA HCOLOR-1     $92...146...HCOLOR=
+1490    .DA HPLOT-1      $93...147...HPLOT
+1500    .DA DRAW-1       $94...148...DRAW
+1510    .DA XDRAW-1      $95...149...XDRAW
+1520    .DA HTAB-1       $96...150...HTAB
+1530    .DA MON.HOME-1   $97...151...HOME
+1540    .DA ROT-1        $98...152...ROT=
+1550    .DA SCALE-1      $99...153...SCALE=
+1560    .DA SHLOAD-1     $9A...154...SHLOAD
+1570    .DA TRACE-1      $9B...155...TRACE
+1580    .DA NOTRACE-1    $9C...156...NOTRACE
+1590    .DA NORMAL-1     $9D...157...NORMAL
+1600    .DA INVERSE-1    $9E...158...INVERSE
+1610    .DA FLASH-1      $9F...159...FLASH
+1620    .DA COLOR-1      $A0...160...COLOR=
+1630    .DA POP-1        $A1...161...POP
+1640    .DA VTAB-1       $A2...162...VTAB
+1650    .DA HIMEM-1      $A3...163...HIMEM:
+1660    .DA LOMEM-1      $A4...164...LOMEM:
+1670    .DA ONERR-1      $A5...165...ONERR
+1680    .DA RESUME-1     $A6...166...RESUME
+1690    .DA RECALL-1     $A7...167...RECALL
+1700    .DA STORE-1      $A8...168...STORE
+1710    .DA SPEED-1      $A9...169...SPEED=
+1720    .DA LET-1        $AA...170...LET
+1730    .DA GOTO-1       $AB...171...GOTO
+1740    .DA RUN-1        $AC...172...RUN
+1750    .DA IF-1         $AD...173...IF
+1760    .DA RESTORE-1    $AE...174...RESTORE
+1770    .DA AMPERSAND.VECTOR-1 $AF...175...&
+1780    .DA GOSUB-1      $B0...176...GOSUB
+1790    .DA POP-1        $B1...177...RETURN
+1800    .DA REM-1        $B2...178...REM
+1810    .DA STOP-1       $B3...179...STOP
+1820    .DA ONGOTO-1     $B4...180...ON
+1830    .DA WAIT-1       $B5...181...WAIT
+1840    .DA LOAD-1       $B6...182...LOAD
+1850    .DA SAVE-1       $B7...183...SAVE
+1860    .DA DEF-1        $B8...184...DEF
+1870    .DA POKE-1       $B9...185...POKE
+1880    .DA PRINT-1      $BA...186...PRINT
+1890    .DA CONT-1       $BB...187...CONT
+1900    .DA LIST-1       $BC...188...LIST
+1910    .DA CLEAR-1      $BD...189...CLEAR
+1920    .DA GET-1        $BE...190...GET
+1930    .DA NEW-1        $BF...191...NEW
+1940 *--------------------------------
+1950 UNFNC
+1960    .DA SGN          $D2...210...SGN
+1970    .DA INT          $D3...211...INT
+1980    .DA ABS          $D4...212...ABS
+1990    .DA USR          $D5...213...USR
+2000    .DA FRE          $D6...214...FRE
+2010    .DA ERROR        $D7...215...SCRN(
+2020    .DA PDL          $D8...216...PDL
+2030    .DA POS          $D9...217...POS
+2040    .DA SQR          $DA...218...SQR
+2050    .DA RND          $DB...219...RND
+2060    .DA LOG          $DC...220...LOG
+2070    .DA EXP          $DD...221...EXP
+2080    .DA COS          $DE...222...COS
+2090    .DA SIN          $DF...223...SIN
+2100    .DA TAN          $E0...224...TAN
+2110    .DA ATN          $E1...225...ATN
+2120    .DA PEEK         $E2...226...PEEK
+2130    .DA LEN          $E3...227...LEN
+2140    .DA STR          $E4...228...STR$
+2150    .DA VAL          $E5...229...VAL
+2160    .DA ASC          $E6...230...ASC
+2170    .DA CHRSTR       $E7...231...CHR$
+2180    .DA LEFTSTR      $E8...232...LEFT$
+2190    .DA RIGHTSTR     $E9...233...RIGHT$
+2200    .DA MIDSTR       $EA...234...MID$
+2210 *--------------------------------
+2220 *      MATH OPERATOR BRANCH TABLE
+2230 *
+2240 *      ONE-BYTE PRECEDENCE CODE
+2250 *      TWO-BYTE ADDRESS
+2260 *--------------------------------
+2270 P.OR   .EQ $46      "OR" IS LOWEST PRECEDENCE
+2280 P.AND  .EQ $50
+2290 P.REL  .EQ $64      RELATIONAL OPERATORS
+2300 P.ADD  .EQ $79      BINARY + AND -
+2310 P.MUL  .EQ $7B      * AND /
+2320 P.PWR  .EQ $7D      EXPONENTIATION
+2330 P.NEQ  .EQ $7F      UNARY - AND COMPARISON =
+2340 *--------------------------------
+2350 MATHTBL
+2360        .DA #P.ADD,FADDT-1  $C8...200...+
+2370        .DA #P.ADD,FSUBT-1  $C9...201...-
+2380        .DA #P.MUL,FMULTT-1 $CA...202...*
+2390        .DA #P.MUL,FDIVT-1  $CB...203.../
+2400        .DA #P.PWR,FPWRT-1  $CC...204...^
+2410        .DA #P.AND,AND-1    $CD...205...AND
+2420        .DA #P.OR,OR-1      $CE...206...OR
+2430 M.NEG  .DA #P.NEQ,NEGOP-1  $CF...207...>
+2440 M.EQU  .DA #P.NEQ,EQUOP-1  $D0...208...=
+2450 M.REL  .DA #P.REL,RELOPS-1 $D1...209...<
+2460 *--------------------------------
+2470 *      TOKEN NAME TABLE
+2480 *--------------------------------
+2490 TOKEN.NAME.TABLE
+2500    .AT "END"        $80...128
+2510    .AT "FOR"        $81...129
+2520    .AT "NEXT"       $82...130
+2530    .AT "DATA"       $83...131
+2540    .AT "INPUT"      $84...132
+2550    .AT "DEL"        $85...133
+2560    .AT "DIM"        $86...134
+2570    .AT "READ"       $87...135
+2580    .AT "GR"         $88...136
+2590    .AT "TEXT"       $89...137
+2600    .AT "PR#"        $8A...138
+2610    .AT "IN#"        $8B...139
+2620    .AT "CALL"       $8C...140
+2630    .AT "PLOT"       $8D...141
+2640    .AT "HLIN"       $8E...142
+2650    .AT "VLIN"       $8F...143
+2660    .AT "HGR2"       $90...144
+2670    .AT "HGR"        $91...145
+2680    .AT "HCOLOR="    $92...146
+2690    .AT "HPLOT"      $93...147
+2700    .AT "DRAW"       $94...148
+2710    .AT "XDRAW"      $95...149
+2720    .AT "HTAB"       $96...150
+2730    .AT "HOME"       $97...151
+2740    .AT "ROT="       $98...152
+2750    .AT "SCALE="     $99...153
+2760    .AT "SHLOAD"     $9A...154
+2770    .AT "TRACE"      $9B...155
+2780    .AT "NOTRACE"    $9C...156
+2790    .AT "NORMAL"     $9D...157
+2800    .AT "INVERSE"    $9E...158
+2810    .AT "FLASH"      $9F...159
+2820    .AT "COLOR="     $A0...160
+2830    .AT "POP"        $A1...161
+2840    .AT "VTAB"       $A2...162
+2850    .AT "HIMEM:"     $A3...163
+2860    .AT "LOMEM:"     $A4...164
+2870    .AT "ONERR"      $A5...165
+2880    .AT "RESUME"     $A6...166
+2890    .AT "RECALL"     $A7...167
+2900    .AT "STORE"      $A8...168
+2910    .AT "SPEED="     $A9...169
+2920    .AT "LET"        $AA...170
+2930    .AT "GOTO"       $AB...171
+2940    .AT "RUN"        $AC...172
+2950    .AT "IF"         $AD...173
+2960    .AT "RESTORE"    $AE...174
+2970    .AT "&"          $AF...175
+2980    .AT "GOSUB"      $B0...176
+2990    .AT "RETURN"     $B1...177
+3000    .AT "REM"        $B2...178
+3010    .AT "STOP"       $B3...179
+3020    .AT "ON"         $B4...180
+3030    .AT "WAIT"       $B5...181
+3040    .AT "LOAD"       $B6...182
+3050    .AT "SAVE"       $B7...183
+3060    .AT "DEF"        $B8...184
+3070    .AT "POKE"       $B9...185
+3080    .AT "PRINT"      $BA...186
+3090    .AT "CONT"       $BB...187
+3100    .AT "LIST"       $BC...188
+3110    .AT "CLEAR"      $BD...189
+3120    .AT "GET"        $BE...190
+3130    .AT "NEW"        $BF...191
+3140    .AT "TAB("       $C0...192
+3150    .AT "TO"         $C1...193
+3160    .AT "FN"         $C2...194
+3170    .AT "SPC("       $C3...195
+3180    .AT "THEN"       $C4...196
+3190    .AT "AT"         $C5...197
+3200    .AT "NOT"        $C6...198
+3210    .AT "STEP"       $C7...199
+3220    .AT "+"          $C8...200
+3230    .AT "-"          $C9...201
+3240    .AT "*"          $CA...202
+3250    .AT "/"          $CB...203
+3260    .AT "^"          $CC...204
+3270    .AT "AND"        $CD...205
+3280    .AT "OR"         $CE...206
+3290    .AT ">"          $CF...207
+3300    .AT "="          $D0...208
+3310    .AT "<"          $D1...209
+3320    .AT "SGN"        $D2...210
+3330    .AT "INT"        $D3...211
+3340    .AT "ABS"        $D4...212
+3350    .AT "USR"        $D5...213
+3360    .AT "FRE"        $D6...214
+3370    .AT "SCRN("      $D7...215
+3380    .AT "PDL"        $D8...216
+3390    .AT "POS"        $D9...217
+3400    .AT "SQR"        $DA...218
+3410    .AT "RND"        $DB...219
+3420    .AT "LOG"        $DC...220
+3430    .AT "EXP"        $DD...221
+3440    .AT "COS"        $DE...222
+3450    .AT "SIN"        $DF...223
+3460    .AT "TAN"        $E0...224
+3470    .AT "ATN"        $E1...225
+3480    .AT "PEEK"       $E2...226
+3490    .AT "LEN"        $E3...227
+3500    .AT "STR$"       $E4...228
+3510    .AT "VAL"        $E5...229
+3520    .AT "ASC"        $E6...230
+3530    .AT "CHR$"       $E7...231
+3540    .AT "LEFT$"      $E8...232
+3550    .AT "RIGHT$"     $E9...233
+3560    .AT "MID$"       $EA...234
+3570    .HS 00       END OF TOKEN NAME TABLE
+3580 *--------------------------------

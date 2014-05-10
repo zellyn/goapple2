@@ -1,0 +1,292 @@
+1010 *--------------------------------
+1020 *      EVALUATE THE EXPRESSION AT TXTPTR, LEAVING THE
+1030 *      RESULT IN FAC.  WORKS FOR BOTH STRING AND NUMERIC
+1040 *      EXPRESSIONS.
+1050 *--------------------------------
+1060 FRMEVL LDX TXTPTR   DECREMENT TXTPTR
+1070        BNE .1
+1080        DEC TXTPTR+1
+1090 .1     DEC TXTPTR
+1100        LDX #0       START WITH PRECEDENCE = 0
+1110        .HS 24       TRICK TO SKIP FOLLOWING "PHA"
+1120 *--------------------------------
+1130 FRMEVL.1
+1140        PHA          PUSH RELOPS FLAGS
+1150        TXA
+1160        PHA          SAVE LAST PRECEDENCE
+1170        LDA #1
+1180        JSR CHKMEM   CHECK IF ENOUGH ROOM ON STACK
+1190        JSR FRM.ELEMENT   GET AN ELEMENT
+1200        LDA #0
+1210        STA CPRTYP   CLEAR COMPARISON OPERATOR FLAGS
+1220 *--------------------------------
+1230 FRMEVL.2
+1240        JSR CHRGOT   CHECK FOR RELATIONAL OPERATORS
+1250 .1     SEC          > IS $CF, = IS $D0, &lt; IS $D1
+1260        SBC #TOKEN.GREATER   > IS 0, = IS 1, &lt; IS 2
+1270        BCC .2       NOT RELATIONAL OPERATOR
+1280        CMP #3
+1290        BCS .2       NOT RELATIONAL OPERATOR
+1300        CMP #1       SET CARRY IF "=" OR "&lt;"
+1310        ROL          NOW > IS 0, = IS 3, &lt; IS 5
+1320        EOR #1       NOW > IS 1, = IS 2, &lt; IS 4
+1330        EOR CPRTYP   SET BITS OF CPRTYP:  00000&lt;=>
+1340        CMP CPRTYP   CHECK FOR ILLEGAL COMBINATIONS
+1350        BCC SNTXERR  IF LESS THAN, A RELOP WAS REPEATED
+1360        STA CPRTYP
+1370        JSR CHRGET   ANOTHER OPERATOR?
+1380        JMP .1       CHECK FOR &lt;,=,> AGAIN
+1390 *--------------------------------
+1400 .2     LDX CPRTYP   DID WE FIND A RELATIONAL OPERATOR?
+1410        BNE FRM.RELATIONAL  YES
+1420        BCS NOTMATH  NO, AND NEXT TOKEN IS > $D1
+1430        ADC #$CF-TOKEN.PLUS  NO, AND NEXT TOKEN &lt; $CF
+1440        BCC NOTMATH  IF NEXT TOKEN &lt; "+"
+1450        ADC VALTYP   + AND LAST RESULT A STRING?
+1460        BNE .3       BRANCH IF NOT
+1470        JMP CAT      CONCATENATE IF SO.
+1480 *--------------------------------
+1490 .3     ADC #$FF     +-*/ IS 0123
+1500        STA INDEX
+1510        ASL          MULTIPLY BY 3
+1520        ADC INDEX    +-*/ IS 0,3,6,9
+1530        TAY
+1540 *--------------------------------
+1550 FRM.PRECEDENCE.TEST
+1560        PLA          GET LAST PRECEDENCE
+1570        CMP MATHTBL,Y
+1580        BCS FRM.PERFORM.1    DO NOW IF HIGHER PRECEDENCE
+1590        JSR CHKNUM   WAS LAST RESULT A #?
+1600 NXOP   PHA          YES, SAVE PRECEDENCE ON STACK
+1610 SAVOP  JSR FRM.RECURSE  SAVE REST, CALL FRMEVL RECURSIVELY
+1620        PLA
+1630        LDY LASTOP
+1640        BPL PREFNC
+1650        TAX
+1660        BEQ GOEX     EXIT IF NO MATH IN EXPRESSION
+1670        BNE FRM.PERFORM.2  ...ALWAYS
+1680 *--------------------------------
+1690 *      FOUND ONE OR MORE RELATIONAL OPERATORS &lt;,=,>
+1700 *--------------------------------
+1710 FRM.RELATIONAL
+1720        LSR VALTYP   (VALTYP) = 0 (NUMERIC), = $FF (STRING)
+1730        TXA          SET CPRTYP TO 0000&lt;=>C
+1740        ROL          WHERE C=0 IF #, C=1 IF STRING
+1750        LDX TXTPTR   BACK UP TXTPTR
+1760        BNE .1
+1770        DEC TXTPTR+1
+1780 .1     DEC TXTPTR
+1790        LDY #M.REL-MATHTBL   POINT AT RELOPS ENTRY
+1800        STA CPRTYP
+1810        BNE FRM.PRECEDENCE.TEST   ...ALWAYS
+1820 *--------------------------------
+1830 PREFNC CMP MATHTBL,Y
+1840        BCS FRM.PERFORM.2  DO NOW IF HIGHER PRECEDENCE
+1850        BCC NXOP     ...ALWAYS
+1860 *--------------------------------
+1870 *      STACK THIS OPERATION AND CALL FRMEVL FOR
+1880 *      ANOTHER ONE
+1890 *--------------------------------
+1900 FRM.RECURSE
+1910        LDA MATHTBL+2,Y
+1920        PHA          PUSH ADDRESS OF OPERATION PERFORMER
+1930        LDA MATHTBL+1,Y
+1940        PHA
+1950        JSR FRM.STACK.1   STACK FAC.SIGN AND FAC
+1960        LDA CPRTYP   A=RELOP FLAGS, X=PRECEDENCE BYTE
+1970        JMP FRMEVL.1      RECURSIVELY CALL FRMEVL
+1980 *--------------------------------
+1990 SNTXERR JMP SYNERR
+2000 *--------------------------------
+2010 *      STACK (FAC)
+2020 *
+2030 *      THREE ENTRY POINTS:
+2040 *          .1, FROM FRMEVL
+2050 *          .2, FROM "STEP"
+2060 *          .3, FROM "FOR"
+2070 *--------------------------------
+2080 FRM.STACK.1
+2090        LDA FAC.SIGN        GET FAC.SIGN TO PUSH IT
+2100        LDX MATHTBL,Y     PRECEDENCE BYTE FROM MATHTBL
+2110 *--------------------------------
+2120 *      ENTER HERE FROM "STEP", TO PUSH STEP SIGN AND VALUE
+2130 *--------------------------------
+2140 FRM.STACK.2
+2150        TAY          FAC.SIGN OR SGN(STEP VALUE)
+2160        PLA          PULL RETURN ADDRESS AND ADD 1
+2170        STA INDEX    &lt;&lt;&lt; ASSUMES NOT ON PAGE BOUNDARY! >>>
+2180        INC INDEX    PLACE BUMPED RETURN ADDRESS IN
+2190        PLA              INDEX,INDEX+1
+2200        STA INDEX+1
+2210        TYA          FAC.SIGN OR SGN(STEP VALUE)
+2220        PHA          PUSH FAC.SIGN OR SGN(STEP VALUE)
+2230 *--------------------------------
+2240 *      ENTER HERE FROM "FOR", WITH (INDEX) = STEP,
+2250 *      TO PUSH INITIAL VALUE OF "FOR" VARIABLE
+2260 *--------------------------------
+2270 FRM.STACK.3
+2280        JSR ROUND.FAC     ROUND TO 32 BITS
+2290        LDA FAC+4         PUSH (FAC)
+2300        PHA
+2310        LDA FAC+3
+2320        PHA
+2330        LDA FAC+2
+2340        PHA
+2350        LDA FAC+1
+2360        PHA
+2370        LDA FAC
+2380        PHA
+2390        JMP (INDEX)       DO RTS FUNNY WAY
+2400 *--------------------------------
+2410 *
+2420 *--------------------------------
+2430 NOTMATH LDY #$FF    SET UP TO EXIT ROUTINE
+2440        PLA
+2450 GOEX   BEQ EXIT       EXIT IF NO MATH TO DO
+2460 *--------------------------------
+2470 *      PERFORM STACKED OPERATION
+2480 *
+2490 *      (A) = PRECEDENCE BYTE
+2500 *      STACK:  1 -- CPRMASK
+2510 *              5 -- (ARG)
+2520 *              2 -- ADDR OF PERFORMER
+2530 *--------------------------------
+2540 FRM.PERFORM.1
+2550        CMP #P.REL   WAS IT RELATIONAL OPERATOR?
+2560        BEQ .1       YES, ALLOW STRING COMPARE
+2570        JSR CHKNUM   MUST BE NUMERIC VALUE
+2580 .1     STY LASTOP
+2590 *--------------------------------
+2600 FRM.PERFORM.2
+2610        PLA          GET 0000&lt;=>C FROM STACK
+2620        LSR          SHIFT TO 00000&lt;=> FORM
+2630        STA CPRMASK   00000&lt;=>
+2640        PLA
+2650        STA ARG      GET FLOATING POINT VALUE OFF STACK,
+2660        PLA          AND PUT IT IN ARG
+2670        STA ARG+1
+2680        PLA
+2690        STA ARG+2
+2700        PLA
+2710        STA ARG+3
+2720        PLA
+2730        STA ARG+4
+2740        PLA
+2750        STA ARG+5
+2760        EOR FAC.SIGN   SAVE EOR OF SIGNS OF THE OPERANDS,
+2770        STA SGNCPR   IN CASE OF MULTIPLY OR DIVIDE
+2780 EXIT   LDA FAC      FAC EXPONENT IN A-REG
+2790        RTS          STATUS .EQ. IF (FAC)=0
+2800 *                   RTS GOES TO PERFORM OPERATION
+2810 *--------------------------------
+2820 *      GET ELEMENT IN EXPRESSION
+2830 *
+2840 *      GET VALUE OF VARIABLE OR NUMBER AT TXTPNT, OR POINT
+2850 *      TO STRING DESCRIPTOR IF A STRING, AND PUT IN FAC.
+2860 *--------------------------------
+2870 FRM.ELEMENT
+2880        LDA #0       ASSUME NUMERIC
+2890        STA VALTYP
+2900 .1     JSR CHRGET
+2910        BCS .3       NOT A DIGIT
+2920 .2     JMP FIN      NUMERIC CONSTANT
+2930 .3     JSR ISLETC   VARIABLE NAME?
+2940        BCS FRM.VARIABLE YES
+2950        CMP #'.'     DECIMAL POINT
+2960        BEQ .2       YES, NUMERIC CONSTANT
+2970        CMP #TOKEN.MINUS  UNARY MINUS?
+2980        BEQ MIN           YES
+2990        CMP #TOKEN.PLUS   UNARY PLUS
+3000        BEQ .1            YES
+3010        CMP #'"'     STRING CONSTANT?
+3020        BNE NOT.     NO
+3030 *--------------------------------
+3040 *      STRING CONSTANT ELEMENT
+3050 *
+3060 *      SET Y,A = (TXTPTR)+CARRY
+3070 *--------------------------------
+3080 STRTXT LDA TXTPTR   ADD (CARRY) TO GET ADDRESS OF 1ST CHAR
+3090        LDY TXTPTR+1      OF STRING IN Y,A
+3100        ADC #0
+3110        BCC .1
+3120        INY
+3130 .1     JSR STRLIT   BUILD DESCRIPTOR TO STRING
+3140 *                   GET ADDRESS OF DESCRIPTOR IN FAC
+3150        JMP POINT    POINT TXTPTR AFTER TRAILING QUOTE
+3160 *--------------------------------
+3170 *      "NOT" FUNCTION
+3180 *      IF FAC=0, RETURN FAC=1
+3190 *      IF FAC&lt;>0, RETURN FAC=0
+3200 *--------------------------------
+3210 NOT.   CMP #TOKEN.NOT
+3220        BNE FN.      NOT "NOT", TRY "FN"
+3230        LDY #M.EQU-MATHTBL  POINT AT = COMPARISON
+3240        BNE EQUL     ...ALWAYS
+3250 *--------------------------------
+3260 *      COMPARISON FOR EQUALITY (= OPERATOR)
+3270 *      ALSO USED TO EVALUATE "NOT" FUNCTION
+3280 *--------------------------------
+3290 EQUOP  LDA FAC      SET "TRUE" IF (FAC) = ZERO
+3300        BNE .1       FALSE
+3310        LDY #1       TRUE
+3320        .HS 2C       TRICK TO SKIP NEXT 2 BYTES
+3330 .1     LDY #0       FALSE
+3340        JMP SNGFLT
+3350 *--------------------------------
+3360 FN.    CMP #TOKEN.FN
+3370        BNE SGN.
+3380        JMP FUNCT
+3390 *--------------------------------
+3400 SGN.   CMP #TOKEN.SGN
+3410        BCC PARCHK
+3420        JMP UNARY
+3430 *--------------------------------
+3440 *      EVALUATE "(EXPRESSION)"
+3450 *--------------------------------
+3460 PARCHK JSR CHKOPN   IS THERE A '(' AT TXTPTR?
+3470        JSR FRMEVL   YES, EVALUATE EXPRESSION
+3480 *--------------------------------
+3490 CHKCLS LDA #')'     CHECK FOR ')'
+3500        .HS 2C       TRICK
+3510 *--------------------------------
+3520 CHKOPN LDA #'('
+3530        .HS 2C       TRICK
+3540 *--------------------------------
+3550 CHKCOM LDA #','     COMMA AT TXTPTR?
+3560 *--------------------------------
+3570 *      UNLESS CHAR AT TXTPTR = (A), SYNTAX ERROR
+3580 *--------------------------------
+3590 SYNCHR LDY #0
+3600        CMP (TXTPTR),Y
+3610        BNE SYNERR
+3620        JMP CHRGET   MATCH, GET NEXT CHAR &amp; RETURN
+3630 *--------------------------------
+3640 SYNERR LDX #ERR.SYNTAX
+3650        JMP ERROR
+3660 *--------------------------------
+3670 MIN    LDY #M.NEG-MATHTBL  POINT AT UNARY MINUS
+3680 EQUL   PLA
+3690        PLA
+3700        JMP SAVOP
+3710 *--------------------------------
+3720 FRM.VARIABLE
+3730        JSR PTRGET
+3740 FRM.VARIABLE.CALL .EQ *-1   SO PTRGET CAN TELL WE CALLED
+3750        STA VPNT     ADDRESS OF VARIABLE
+3760        STY VPNT+1
+3770        LDX VALTYP   NUMERIC OR STRING?
+3780        BEQ .1       NUMERIC
+3790        LDX #0       STRING
+3800        STX STRNG1+1
+3810        RTS
+3820 .1     LDX VALTYP+1 NUMERIC, WHICH TYPE?
+3830        BPL .2       FLOATING POINT
+3840        LDY #0       INTEGER
+3850        LDA (VPNT),Y
+3860        TAX          GET VALUE IN A,Y
+3870        INY
+3880        LDA (VPNT),Y
+3890        TAY
+3900        TXA
+3910        JMP GIVAYF   CONVERT A,Y TO FLOATING POINT
+3920 .2     JMP LOAD.FAC.FROM.YA

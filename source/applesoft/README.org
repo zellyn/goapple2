@@ -1,0 +1,41 @@
+* Source
+
+The files in this directory come from
+http://www.txbobsc.com/scsc/scdocumentor/. As documented below, I
+obtained permission from Bob Sander-Cederlof to include the source
+code with my emulator.
+
+* Permission from Bob Sander-Cederlof
+
+** My email: 2013-04-11
+
+Hi Mr. Sander-Cederlof,
+
+I am slowly working on building a 6502 and Apple II emulator in Go
+(you can see the code here (https://github.com/zellyn/go6502,
+https://github.com/zellyn/goapple2), and I ran across your fantastic
+S-C assembler listings of various ROMs: Applesoft Basic, DOS, etc.
+
+I was toying with the idea of writing an S-C
+Assembler-syntax-compatible assembler in Go too, and including the
+source listings instead of the ROM images in my Apple II emulator: I
+thought it would be fun, and they'd compile in a fraction of a
+second. It would also make it interesting to be able to modify them on
+the fly and restart to see the changes.
+
+Anyway, I was wondering whether you were okay with (a) me building an
+S-C Assembler-compatible assembler of my own, and (b) including your
+source listings with my Apple II emulator. I completely understand if
+there are reasons that would not be okay with you, but I thought I'd
+check.
+
+Yours,
+
+Zellyn Hunter
+
+** Bob Sander-Cederlof's reply: 2013-04-11
+
+Sounds like lots of fun!
+You have my permission.
+I will be interested in how it turns out!
+

@@ -1,0 +1,312 @@
+1010 *--------------------------------
+1020 *      "RUN" COMMAND
+1030 *--------------------------------
+1040 RUN    PHP          SAVE STATUS WHILE SUBTRACTING
+1050        DEC CURLIN+1 IF WAS $FF (MEANING DIRECT MODE)
+1060 *                   MAKE IT "RUNNING MODE"
+1070        PLP          GET STATUS AGAIN (FROM CHRGET)
+1080        BNE .1       PROBABLY A LINE NUMBER
+1090        JMP SETPTRS  START AT BEGINNING OF PROGRAM
+1100 .1     JSR CLEARC   CLEAR VARIABLES
+1110        JMP GO.TO.LINE   JOIN GOSUB STATEMENT
+1120 *--------------------------------
+1130 *      "GOSUB" STATEMENT
+1140 *
+1150 *      LEAVES 7 BYTES ON STACK:
+1160 *      2 -- RETURN ADDRESS (NEWSTT)
+1170 *      2 -- TXTPTR
+1180 *      2 -- LINE #
+1190 *      1 -- GOSUB TOKEN ($B0)
+1200 *--------------------------------
+1210 GOSUB  LDA #3       BE SURE ENOUGH ROOM ON STACK
+1220        JSR CHKMEM
+1230        LDA TXTPTR+1
+1240        PHA
+1250        LDA TXTPTR
+1260        PHA
+1270        LDA CURLIN+1
+1280        PHA
+1290        LDA CURLIN
+1300        PHA
+1310        LDA #TOKEN.GOSUB
+1320        PHA
+1330 GO.TO.LINE
+1340        JSR CHRGOT
+1350        JSR GOTO
+1360        JMP NEWSTT
+1370 *--------------------------------
+1380 *      "GOTO" STATEMENT
+1390 *      ALSO USED BY "RUN" AND "GOSUB"
+1400 *--------------------------------
+1410 GOTO   JSR LINGET   GET GOTO LINE
+1420        JSR REMN     POINT Y TO EOL
+1430        LDA CURLIN+1  IS CURRENT PAGE &lt; GOTO PAGE?
+1440        CMP LINNUM+1
+1450        BCS .1       SEARCH FROM PROG START IF NOT
+1460        TYA          OTHERWISE SEARCH FROM NEXT LINE
+1470        SEC
+1480        ADC TXTPTR
+1490        LDX TXTPTR+1
+1500        BCC .2
+1510        INX
+1520        BCS .2
+1530 .1     LDA TXTTAB   GET PROGRAM BEGINNING
+1540        LDX TXTTAB+1
+1550 .2     JSR FL1      SEARCH FOR GOTO LINE
+1560        BCC UNDERR   ERROR IF NOT THERE
+1570        LDA LOWTR    TXTPTR = START OF THE DESTINATION LINE
+1580        SBC #1
+1590        STA TXTPTR
+1600        LDA LOWTR+1
+1610        SBC #0
+1620        STA TXTPTR+1
+1630 RTS.5  RTS          RETURN TO NEWSTT OR GOSUB
+1640 *--------------------------------
+1650 *      "POP" AND "RETURN" STATEMENTS
+1660 *--------------------------------
+1670 POP    BNE RTS.5
+1680        LDA #$FF
+1690        STA FORPNT   &lt;&lt;&lt; BUG: SHOULD BE FORPNT+1 >>>
+1700 *  &lt;&lt;&lt; SEE "ALL ABOUT APPLESOFT", PAGES 100,101 >>>
+1710        JSR GTFORPNT  TO CANCEL FOR/NEXT IN SUB
+1720        TXS
+1730        CMP #TOKEN.GOSUB  LAST GOSUB FOUND?
+1740        BEQ RETURN
+1750        LDX #ERR.NOGOSUB
+1760        .HS 2C       FAKE
+1770 UNDERR LDX #ERR.UNDEFSTAT
+1780        JMP ERROR
+1790 *--------------------------------
+1800 SYNERR.2 JMP SYNERR
+1810 *--------------------------------
+1820 RETURN PLA          DISCARD GOSUB TOKEN
+1830        PLA          
+1840        CPY #TOKEN.POP*2
+1850        BEQ PULL3    BRANCH IF A POP
+1860        STA CURLIN   PULL LINE #
+1870        PLA
+1880        STA CURLIN+1
+1890        PLA
+1900        STA TXTPTR   PULL TXTPTR
+1910        PLA
+1920        STA TXTPTR+1
+1930 *--------------------------------
+1940 *      "DATA" STATEMENT
+1950 *      EXECUTED BY SKIPPING TO NEXT COLON OR EOL
+1960 *--------------------------------
+1970 DATA   JSR DATAN    MOVE TO NEXT STATEMENT
+1980 *--------------------------------
+1990 *      ADD (Y) TO TXTPTR
+2000 *--------------------------------
+2010 ADDON  TYA
+2020        CLC
+2030        ADC TXTPTR
+2040        STA TXTPTR
+2050        BCC .1
+2060        INC TXTPTR+1
+2070 .1
+2080 RTS.6  RTS
+2090 *--------------------------------
+2100 *      SCAN AHEAD TO NEXT ":" OR EOL
+2110 *--------------------------------
+2120 DATAN  LDX #':'     GET OFFSET IN Y TO EOL OR ":"
+2130        .HS 2C       FAKE
+2140 *--------------------------------
+2150 REMN   LDX #0       TO EOL ONLY
+2160        STX CHARAC
+2170        LDY #0
+2180        STY ENDCHR
+2190 .1     LDA ENDCHR   TRICK TO COUNT QUOTE PARITY
+2200        LDX CHARAC
+2210        STA CHARAC
+2220        STX ENDCHR
+2230 .2     LDA (TXTPTR),Y
+2240        BEQ RTS.6    END OF LINE
+2250        CMP ENDCHR
+2260        BEQ RTS.6    COLON IF LOOKING FOR COLONS
+2270        INY
+2280        CMP #'"'
+2290        BNE .2
+2300        BEQ .1       ...ALWAYS
+2310 *--------------------------------
+2320 PULL3  PLA
+2330        PLA
+2340        PLA
+2350        RTS
+2360 *--------------------------------
+2370 *      "IF" STATEMENT
+2380 *--------------------------------
+2390 IF     JSR FRMEVL
+2400        JSR CHRGOT
+2410        CMP #TOKEN.GOTO
+2420        BEQ .1
+2430        LDA #TOKEN.THEN
+2440        JSR SYNCHR
+2450 .1     LDA FAC      CONDITION TRUE OR FALSE?
+2460        BNE IF.TRUE  BRANCH IF TRUE
+2470 *--------------------------------
+2480 *      "REM" STATEMENT, OR FALSE "IF" STATEMENT
+2490 *--------------------------------
+2500 REM    JSR REMN     SKIP REST OF LINE
+2510        BEQ ADDON    ...ALWAYS
+2520 *--------------------------------
+2530 IF.TRUE
+2540        JSR CHRGOT   COMMAND OR NUMBER?
+2550        BCS .1       COMMAND
+2560        JMP GOTO     NUMBER
+2570 .1     JMP EXECUTE.STATEMENT
+2580 *--------------------------------
+2590 *      "ON" STATEMENT
+2600 *
+2610 *      ON &lt;EXP> GOTO &lt;LIST>
+2620 *      ON &lt;EXP> GOSUB &lt;LIST>
+2630 *--------------------------------
+2640 ONGOTO JSR GETBYT   EVALUATE &lt;EXP>, AS BYTE IN FAC+4
+2650        PHA          SAVE NEXT CHAR ON STACK
+2660        CMP #TOKEN.GOSUB
+2670        BEQ ON.2
+2680 ON.1   CMP #TOKEN.GOTO
+2690        BNE SYNERR.2
+2700 ON.2   DEC FAC+4    COUNTED TO RIGHT ONE YET?
+2710        BNE .3       NO, KEEP LOOKING
+2720        PLA          YES, RETRIEVE CMD
+2730        JMP EXECUTE.STATEMENT.1   AND GO.
+2740 .3     JSR CHRGET   PRIME CONVERT SUBROUTINE
+2750        JSR LINGET   CONVERT LINE #
+2760        CMP #','     TERMINATE WITH COMMA?
+2770        BEQ ON.2     YES
+2780        PLA          NO, END OF LIST, SO IGNORE
+2790 RTS.7  RTS
+2800 *--------------------------------
+2810 *      CONVERT LINE NUMBER
+2820 *--------------------------------
+2830 LINGET LDX #0       ASC # TO HEX ADDRESS
+2840        STX LINNUM   IN LINNUM.
+2850        STX LINNUM+1
+2860 .1     BCS RTS.7    NOT A DIGIT
+2870        SBC #'0'-1   CONVERT DIGIT TO BINARY
+2880        STA CHARAC   SAVE THE DIGIT
+2890        LDA LINNUM+1 CHECK RANGE
+2900        STA INDEX
+2910        CMP /6400    LINE # TOO LARGE?
+2920        BCS ON.1     YES, > 63999, GO INDIRECTLY TO 
+2930 *                   "SYNTAX ERROR".
+2940 *&lt;&lt;&lt;&lt;&lt;DANGEROUS CODE>>>>>
+2950 *      NOTE THAT IF (A) = $AB ON THE LINE ABOVE,
+2960 *      ON.1 WILL COMPARE = AND CAUSE A CATASTROPHIC
+2970 *      JUMP TO $22D9 (FOR GOTO), OR OTHER LOCATIONS
+2980 *      FOR OTHER CALLS TO LINGET.
+2990 *
+3000 *      YOU CAN SEE THIS IS YOU FIRST PUT "BRK" IN $22D9,
+3010 *      THEN TYPE "GO TO 437761".
+3020 *
+3030 *      ANY VALUE FROM 437760 THROUGH 440319 WILL CAUSE
+3040 *      THE PROBLEM.  ($AB00 - $ABFF)
+3050 *&lt;&lt;&lt;&lt;&lt;DANGEROUS CODE>>>>>
+3060        LDA LINNUM   MULTIPLY BY TEN
+3070        ASL
+3080        ROL INDEX
+3090        ASL
+3100        ROL INDEX
+3110        ADC LINNUM
+3120        STA LINNUM
+3130        LDA INDEX
+3140        ADC LINNUM+1
+3150        STA LINNUM+1
+3160        ASL LINNUM
+3170        ROL LINNUM+1
+3180        LDA LINNUM
+3190        ADC CHARAC   ADD DIGIT
+3200        STA LINNUM
+3210        BCC .2
+3220        INC LINNUM+1
+3230 .2     JSR CHRGET   GET NEXT CHAR
+3240        JMP .1       MORE CONVERTING
+3250 *--------------------------------
+3260 *      "LET" STATEMENT
+3270 *
+3280 *      LET &lt;VAR> = &lt;EXP>
+3290 *      &lt;VAR> = &lt;EXP>
+3300 *--------------------------------
+3310 LET    JSR PTRGET   GET &lt;VAR>
+3320        STA FORPNT
+3330        STY FORPNT+1
+3340        LDA #TOKEN.EQUAL
+3350        JSR SYNCHR
+3360        LDA VALTYP+1      SAVE VARIABLE TYPE
+3370        PHA
+3380        LDA VALTYP
+3390        PHA
+3400        JSR FRMEVL   EVALUATE &lt;EXP>
+3410        PLA
+3420        ROL
+3430        JSR CHKVAL
+3440        BNE LET.STRING
+3450        PLA
+3460 *--------------------------------
+3470 LET2   BPL .1       REAL VARIABLE
+3480        JSR ROUND.FAC     INTEGER VAR: ROUND TO 32 BITS
+3490        JSR AYINT         TRUNCATE TO 16-BITS
+3500        LDY #0
+3510        LDA FAC+3
+3520        STA (FORPNT),Y
+3530        INY
+3540        LDA FAC+4
+3550        STA (FORPNT),Y
+3560        RTS
+3570 *--------------------------------
+3580 *      REAL VARIABLE = EXPRESSION
+3590 *--------------------------------
+3600 .1     JMP SETFOR
+3610 *--------------------------------
+3620 LET.STRING
+3630        PLA
+3640 *--------------------------------
+3650 *      INSTALL STRING, DESCRIPTOR ADDRESS IS AT FAC+3,4
+3660 *--------------------------------
+3670 PUTSTR LDY #2       STRING DATA ALREADY IN STRING AREA?
+3680        LDA (FAC+3),Y      (STRING AREA IS BTWN FRETOP
+3690        CMP FRETOP+1           HIMEM)
+3700        BCC .2       YES, DATA ALREADY UP THERE
+3710        BNE .1       NO
+3720        DEY          MAYBE, TEST LOW BYTE OF POINTER
+3730        LDA (FAC+3),Y
+3740        CMP FRETOP
+3750        BCC .2       YES, ALREADY THERE
+3760 .1     LDY FAC+4   NO. DESCRIPTOR ALREADY AMONG VARIABLES?
+3770        CPY VARTAB+1
+3780        BCC .2       NO
+3790        BNE .3       YES
+3800        LDA FAC+3    MAYBE, COMPARE LO-BYTE
+3810        CMP VARTAB
+3820        BCS .3       YES, DESCRIPTOR IS AMONG VARIABLES
+3830 .2     LDA FAC+3    EITHER STRING ALREADY ON TOP, OR
+3840        LDY FAC+4    DESCRIPTOR IS NOT A VARIABLE
+3850        JMP .4       SO JUST STORE THE DESCRIPTOR
+3860 *--------------------------------
+3870 *      STRING NOT YET IN STRING AREA,
+3880 *      AND DESCRIPTOR IS A VARIABLE
+3890 *--------------------------------
+3900 .3     LDY #0       POINT AT LENGTH IN DESCRIPTOR
+3910        LDA (FAC+3),Y GET LENGTH
+3920        JSR STRINI   MAKE A STRING THAT LONG UP ABOVE
+3930        LDA DSCPTR   SET UP SOURCE PNTR FOR MONINS
+3940        LDY DSCPTR+1
+3950        STA STRNG1
+3960        STY STRNG1+1
+3970        JSR MOVINS   MOVE STRING DATA TO NEW AREA
+3980        LDA #FAC     ADDRESS OF DESCRIPTOR IS IN FAC
+3990        LDY /FAC
+4000 .4     STA DSCPTR
+4010        STY DSCPTR+1
+4020        JSR FRETMS   DISCARD DESCRIPTOR IF 'TWAS TEMPORARY
+4030        LDY #0       COPY STRING DESCRIPTOR
+4040        LDA (DSCPTR),Y
+4050        STA (FORPNT),Y
+4060        INY
+4070        LDA (DSCPTR),Y
+4080        STA (FORPNT),Y
+4090        INY
+4100        LDA (DSCPTR),Y
+4110        STA (FORPNT),Y
+4120        RTS

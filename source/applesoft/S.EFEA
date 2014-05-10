@@ -1,0 +1,273 @@
+1010 *--------------------------------
+1020 *      "COS" FUNCTION
+1030 *--------------------------------
+1040 COS    LDA #CON.PI.HALF     COS(X)=SIN(X + PI/2)
+1050        LDY /CON.PI.HALF
+1060        JSR FADD
+1070 *--------------------------------
+1080 *      "SIN" FUNCTION
+1090 *--------------------------------
+1100 SIN    JSR COPY.FAC.TO.ARG.ROUNDED
+1110        LDA #CON.PI.DOUB  REMOVE MULTIPLES OF 2*PI
+1120        LDY /CON.PI.DOUB  BY DIVIDING AND SAVING
+1130        LDX ARG.SIGN      THE FRACTIONAL PART
+1140        JSR DIV           USE SIGN OF ARGUMENT
+1150        JSR COPY.FAC.TO.ARG.ROUNDED
+1160        JSR INT      TAKE INTEGER PART
+1170        LDA #0       &lt;&lt;&lt; WASTED LINES, BECAUSE FSUBT >>>
+1180        STA SGNCPR   &lt;&lt;&lt; CHANGES SGNCPR AGAIN        >>>
+1190        JSR FSUBT    SUBTRACT TO GET FRACTIONAL PART
+1200 *--------------------------------
+1210 *      (FAC) = ANGLE AS A FRACTION OF A FULL CIRCLE
+1220 *
+1230 *      NOW FOLD THE RANGE INTO A QUARTER CIRCLE
+1240 *
+1250 *      &lt;&lt;&lt; THERE ARE MUCH SIMPLER WAYS TO DO THIS >>>
+1260 *--------------------------------
+1270        LDA #QUARTER      1/4 - FRACTION MAKES
+1280        LDY /QUARTER      -3/4 &lt;= FRACTION &lt; 1/4
+1290        JSR FSUB
+1300        LDA FAC.SIGN      TEST SIGN OF RESULT
+1310        PHA               SAVE SIGN FOR LATER UNFOLDING
+1320        BPL SIN.1         ALREADY 0...1/4
+1330        JSR FADDH         ADD 1/2 TO SHIFT TO -1/4...1/2
+1340        LDA FAC.SIGN      TEST SIGN
+1350        BMI SIN.2         -1/4...0
+1360 *                        0...1/2
+1370        LDA SIGNFLG       SIGNFLG INITIALIZED = 0 IN "TAN"
+1380        EOR #$FF          FUNCTION
+1390        STA SIGNFLG      "TAN" IS ONLY USER OF SIGNFLG TOO
+1400 *--------------------------------
+1410 *      IF FALL THRU, RANGE IS 0...1/2
+1420 *      IF BRANCH HERE, RANGE IS 0...1/4
+1430 *--------------------------------
+1440 SIN.1  JSR NEGOP
+1450 *--------------------------------
+1460 *      IF FALL THRU, RANGE IS -1/2...0
+1470 *      IF BRANCH HERE, RANGE IS -1/4...0
+1480 *--------------------------------
+1490 SIN.2  LDA #QUARTER      ADD 1/4 TO SHIFT RANGE 
+1500        LDY /QUARTER      TO -1/4...1/4
+1510        JSR FADD
+1520        PLA               GET SAVED SIGN FROM ABOVE
+1530        BPL .1 
+1540        JSR NEGOP         MAKE RANGE 0...1/4
+1550 .1     LDA #POLY.SIN     DO STANDARD SIN SERIES
+1560        LDY /POLY.SIN
+1570        JMP POLYNOMIAL.ODD
+1580 *--------------------------------
+1590 *      "TAN" FUNCTION
+1600 *
+1610 *      COMPUTE TAN(X) = SIN(X) / COS(X)
+1620 *--------------------------------
+1630 TAN    JSR STORE.FAC.IN.TEMP1.ROUNDED
+1640        LDA #0       SIGNFLG WILL BE TOGGLED IF 2ND OR 3RD
+1650        STA SIGNFLG  QUADRANT
+1660        JSR SIN      GET SIN(X)
+1670        LDX #TEMP3   SAVE SIN(X) IN TEMP3
+1680        LDY /TEMP3
+1690        JSR GO.MOVMF &lt;&lt;&lt;FUNNY WAY TO CALL MOVMF! >>>
+1700        LDA #TEMP1   RETRIEVE X
+1710        LDY /TEMP1
+1720        JSR LOAD.FAC.FROM.YA
+1730        LDA #0       AND COMPUTE COS(X)
+1740        STA FAC.SIGN
+1750        LDA SIGNFLG
+1760        JSR TAN.1    WEIRD &amp; DANGEROUS WAY TO GET INTO SIN
+1770        LDA #TEMP3   NOW FORM SIN/COS
+1780        LDY /TEMP3
+1790        JMP FDIV
+1800 *--------------------------------
+1810 TAN.1  PHA          SHAME, SHAME!
+1820        JMP SIN.1
+1830 *--------------------------------
+1840 CON.PI.HALF .HS 81490FDAA2
+1850 CON.PI.DOUB .HS 83490FDAA2
+1860 QUARTER     .HS 7F00000000
+1870 *--------------------------------
+1880 POLY.SIN .DA #5     POWER OF POLYNOMIAL
+1890          .HS 84E61A2D1B  (2PI)^11/11!
+1900          .HS 862807FBF8  (2PI)^9/9!
+1910          .HS 8799688901  (2PI)^7/7!
+1920          .HS 872335DFE1  (2PI)^5/5!
+1930          .HS 86A55DE728  (2PI)^3/3!
+1940          .HS 83490FDAA2  2PI
+1950 *--------------------------------
+1960 *  &lt;&lt;&lt; NEXT TEN BYTES ARE NEVER REFERENCED >>>
+1970 *--------------------------------
+1980          .HS A6D3C1C8D4  OR "&amp;SAHT" IN ASCII [exclusive-or each byte with $87 ]
+                                                  [to get the string "!TFOSORCIM"  ]
+1990          .HS C8D5C4CECA  OR "HUDNJ" IN ASCII [which is "MICROSOFT!" backwards.]
+2000 *--------------------------------
+2010 *      "ATN" FUNCTION
+2020 *--------------------------------
+2030 ATN    LDA FAC.SIGN      FOLD THE ARGUMENT RANGE FIRST
+2040        PHA               SAVE SIGN FOR LATER UNFOLDING
+2050        BPL .1            .GE. 0
+2060        JSR NEGOP         .LT. 0, SO COMPLEMENT
+2070 .1     LDA FAC           IF .GE. 1, FORM RECIPROCAL
+2080        PHA               SAVE FOR LATER UNFOLDING
+2090        CMP #$81          (EXPONENT FOR .GE. 1
+2100        BCC .2            X &lt; 1
+2110        LDA #CON.ONE      FORM 1/X
+2120        LDY /CON.ONE
+2130        JSR FDIV
+2140 *--------------------------------
+2150 *      0 &lt;= X &lt;= 1
+2160 *      0 &lt;= ATN(X) &lt;= PI/8
+2170 *--------------------------------
+2180 .2     LDA #POLY.ATN     COMPUTE POLYNOMIAL APPROXIMATION
+2190        LDY /POLY.ATN
+2200        JSR POLYNOMIAL.ODD
+2210        PLA               START TO UNFOLD
+2220        CMP #$81          WAS IT .GE. 1?
+2230        BCC .3            NO
+2240        LDA #CON.PI.HALF  YES, SUBTRACT FROM PI/2
+2250        LDY /CON.PI.HALF
+2260        JSR FSUB
+2270 .3     PLA               WAS IT NEGATIVE?
+2280        BPL RTS.20        NO
+2290        JMP NEGOP         YES, COMPLEMENT
+2300 RTS.20 RTS
+2310 *--------------------------------
+2320 POLY.ATN .DA #11    POWER OF POLYNOMIAL
+2330          .HS 76B383BDD3
+2340          .HS 791EF4A6F5
+2350          .HS 7B83FCB010
+2360          .HS 7C0C1F67CA
+2370          .HS 7CDE53CBC1
+2380          .HS 7D1464704C
+2390          .HS 7DB7EA517A
+2400          .HS 7D6330887E
+2410          .HS 7E9244993A
+2420          .HS 7E4CCC91C7
+2430          .HS 7FAAAAAA13
+2440          .HS 8100000000
+2450 *--------------------------------
+2460 *      GENERIC COPY OF CHRGET SUBROUTINE, WHICH
+2470 *      IS COPIED INTO $00B1...$00C8 DURING INITIALIZATION
+2480 *
+2490 *      CORNELIS BONGERS DESCRIBED SEVERAL IMPROVEMENTS 
+2500 *      TO CHRGET IN MICRO MAGAZINE OR CALL A.P.P.L.E.
+2510 *      (I DON'T REMEMBER WHICH OR EXACTLY WHEN)
+2520 *--------------------------------
+2530 GENERIC.CHRGET
+2540        INC TXTPTR
+2550        BNE .1
+2560        INC TXTPTR+1
+2570 .1     LDA $EA60    &lt;&lt;&lt; ACTUAL ADDRESS FILLED IN LATER >>>
+2580        CMP #':'     EOS, ALSO TOP OF NUMERIC RANGE
+2590        BCS .2       NOT NUMBER, MIGHT BE EOS
+2600        CMP #' '     IGNORE BLANKS
+2610        BEQ GENERIC.CHRGET
+2620        SEC          TEST FOR NUMERIC RANGE IN WAY THAT
+2630        SBC #'0'     CLEARS CARRY IF CHAR IS DIGIT
+2640        SEC          AND LEAVES CHAR IN A-REG
+2650        SBC #-'0'
+2660 .2     RTS
+2670 *--------------------------------
+2680 *      INITIAL VALUE FOR RANDOM NUMBER, ALSO COPIED
+2690 *      IN ALONG WITH CHRGET, BUT ERRONEOUSLY:
+2700 *  &lt;&lt;&lt; THE LAST BYTE IS NOT COPIED >>>
+2710 *--------------------------------
+2720        .HS 804FC75258  APPROX. = .811635157
+2730 GENERIC.END
+2740 *--------------------------------
+2750 COLD.START
+2760        LDX #$FF     SET DIRECT MODE FLAG
+2770        STX CURLIN+1
+2780        LDX #$FB     SET STACK POINTER, LEAVING ROOM FOR
+2790        TXS          LINE BUFFER DURING PARSING
+2800        LDA #COLD.START   SET RESTART TO COLD.START
+2810        LDY /COLD.START   UNTIL COLDSTART IS COMPLETED
+2820        STA GOWARM+1
+2830        STY GOWARM+2
+2840        STA GOSTROUT+1    ALSO SECOND USER VECTOR...
+2850        STY GOSTROUT+2  ..WE SIMPLY MUST FINISH COLD.START!
+2860        JSR NORMAL        SET NORMAL DISPLAY MODE
+2870        LDA #$4C          "JMP" OPCODE FOR 4 VECTORS
+2880        STA GOWARM        WARM START
+2890        STA GOSTROUT      ANYONE EVER USE THIS ONE?
+2900        STA JMPADRS       USED BY FUNCTIONS (JSR JMPADRS)
+2910        STA USR           "USR" FUNCTION VECTOR
+2920        LDA #IQERR        POINT "USR" TO ILLEGAL QUANTITY
+2930        LDY /IQERR        ERROR, UNTIL USER SETS IT UP
+2940        STA USR+1
+2950        STY USR+2
+2960 *--------------------------------
+2970 *      MOVE GENERIC CHRGET AND RANDOM SEED INTO PLACE
+2980 *
+2990 *  &lt;&lt;&lt; NOTE THAT LOOP VALUE IS WRONG!          >>>
+3000 *  &lt;&lt;&lt; THE LAST BYTE OF THE RANDOM SEED IS NOT >>>
+3010 *  &lt;&lt;&lt; COPIED INTO PAGE ZERO!                  >>>
+3020 *--------------------------------
+3030        LDX #GENERIC.END-GENERIC.CHRGET-1
+3040 .1     LDA GENERIC.CHRGET-1,X
+3050        STA CHRGET-1,X
+3060        STX SPEEDZ        ON LAST PASS STORES $01)
+3070        DEX
+3080        BNE .1
+3090 *--------------------------------
+3100        STX TRCFLG        X=0, TURN OFF TRACING
+3110        TXA               A=0
+3120        STA SHIFT.SIGN.EXT
+3130        STA LASTPT+1
+3140        PHA               PUT $00 ON STACK (WHAT FOR?)
+3150        LDA #3       SET LENGTH OF TEMP. STRING DESCRIPTORS
+3160        STA DSCLEN   FOR GARBAGE COLLECTION SUBROUTINE
+3170        JSR CRDO     PRINT &lt;RETURN>
+3180        LDA #1       SET UP FAKE FORWARD LINK
+3190        STA INPUT.BUFFER-3
+3200        STA INPUT.BUFFER-4
+3210        LDX #TEMPST  INIT INDEX TO TEMP STRING DESCRIPTORS
+3220        STX TEMPPT
+3230 *--------------------------------
+3240 *      FIND HIGH END OF RAM
+3250 *--------------------------------
+3260        LDA #$0800   SET UP POINTER TO LOW END OF RAM
+3270        LDY /$0800
+3280        STA LINNUM
+3290        STY LINNUM+1
+3300        LDY #0
+3310 .2     INC LINNUM+1      TEST FIRST BYTE OF EACH PAGE
+3320        LDA (LINNUM),Y    BY COMPLEMENTING IT AND WATCHING
+3330        EOR #$FF          IT CHANGE THE SAME WAY
+3340        STA (LINNUM),Y
+3350        CMP (LINNUM),Y    ROM OR EMPTY SOCKETS WON'T TRACK
+3360        BNE .3            NOT RAM HERE
+3370        EOR #$FF          RESTORE ORIGINAL VALUE
+3380        STA (LINNUM),Y
+3390        CMP (LINNUM),Y    DID IT TRACK AGAIN?
+3400        BEQ .2            YES, STILL IN RAM
+3410 .3     LDY LINNUM        NO, END OF RAM
+3420        LDA LINNUM+1
+3430        AND #$F0          FORCE A MULTIPLE OF 4096 BYTES
+3440        STY MEMSIZ  (BAD RAM MAY HAVE YIELDED NON-MULTIPLE)
+3450        STA MEMSIZ+1
+3460        STY FRETOP        SET HIMEM AND BOTTOM OF STRINGS
+3470        STA FRETOP+1
+3480        LDX #$0800        SET PROGRAM POINTER TO $0800
+3490        LDY /$0800
+3500        STX TXTTAB
+3510        STY TXTTAB+1
+3520        LDY #0            TURN OFF SEMI-SECRET LOCK FLAG
+3530        STY LOCK
+3540        TYA               A=0 TOO
+3550        STA (TXTTAB),Y    FIRST BYTE IN PROGRAM SPACE = 0
+3560        INC TXTTAB        ADVANCE PAST THE $00
+3570        BNE .4
+3580        INC TXTTAB+1
+3590 .4     LDA TXTTAB
+3600        LDY TXTTAB+1
+3610        JSR REASON        SET REST OF POINTERS UP
+3620        JSR SCRTCH        MORE POINTERS
+3630        LDA #STROUT       PUT CORRECT ADDRESSES IN TWO
+3640        LDY /STROUT       USER VECTORS
+3650        STA GOSTROUT+1
+3660        STY GOSTROUT+2
+3670        LDA #RESTART
+3680        LDY /RESTART
+3690        STA GOWARM+1
+3700        STY GOWARM+2
+3710        JMP (GOWARM+1)    SILLY, WHY NOT JUST "JMP RESTART"
+3720 *--------------------------------

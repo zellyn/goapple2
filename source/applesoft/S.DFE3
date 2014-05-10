@@ -1,0 +1,351 @@
+1010 *--------------------------------
+1020 *      PTRGET -- GENERAL VARIABLE SCAN
+1030 *
+1040 *      SCANS VARIABLE NAME AT TXTPTR, AND SEARCHES THE
+1050 *      VARTAB AND ARYTAB FOR THE NAME.
+1060 *      IF NOT FOUND, CREATE VARIABLE OF APPROPRIATE TYPE.
+1070 *      RETURN WITH ADDRESS IN VARPNT AND Y,A
+1080 *
+1090 *      ACTUAL ACTIVITY CONTROLLED SOMEWHAT BY TWO FLAGS:
+1100 *          DIMFLG -- NONZERO IF CALLED FROM "DIM"
+1110 *                    ELSE = 0
+1120 *
+1130 *          SUBFLG -- = $00
+1140 *                    = $40 IF CALLED FROM "GETARYPT"
+1150 *                    = $80 IF CALLED FROM "DEF FN"
+1160 *                    = $C1-DA IF CALLED FROM "FN"
+1170 *--------------------------------
+1180 PTRGET LDX #0
+1190        JSR CHRGOT   GET FIRST CHAR OF VARIABLE NAME
+1200 *--------------------------------
+1210 PTRGET2
+1220        STX DIMFLG   X IS NONZERO IF FROM DIM
+1230 *--------------------------------
+1240 PTRGET3
+1250        STA VARNAM
+1260        JSR CHRGOT
+1270        JSR ISLETC   IS IT A LETTER?
+1280        BCS NAMOK    YES, OKAY SO FAR
+1290 BADNAM JMP SYNERR   NO, SYNTAX ERROR
+1300 NAMOK  LDX #0
+1310        STX VALTYP
+1320        STX VALTYP+1
+1330        JMP PTRGET4  TO BRANCH ACROSS $E000 VECTORS
+1340 *--------------------------------
+1350 *      DOS AND MONITOR CALL BASIC AT $E000 AND $E003
+1360 *--------------------------------
+1370        JMP COLD.START
+1380        JMP RESTART
+1390        BRK          &lt;&lt;&lt; WASTED BYTE >>>
+1400 *--------------------------------
+1410 PTRGET4
+1420        JSR CHRGET   SECOND CHAR OF VARIABLE NAME
+1430        BCC .1       NUMERIC
+1440        JSR ISLETC   LETTER?
+1450        BCC .3       NO, END OF NAME
+1460 .1     TAX          SAVE SECOND CHAR OF NAME IN X
+1470 .2     JSR CHRGET   SCAN TO END OF VARIABLE NAME
+1480        BCC .2       NUMERIC
+1490        JSR ISLETC
+1500        BCS .2       ALPHA
+1510 .3     CMP #'$'     STRING?
+1520        BNE .4       NO
+1530        LDA #$FF
+1540        STA VALTYP
+1550        BNE .5       ...ALWAYS
+1560 .4     CMP #'%'     INTEGER?
+1570        BNE .6       NO
+1580        LDA SUBFLG   YES; INTEGER VARIABLE ALLOWED?
+1590        BMI BADNAM   NO, SYNTAX ERROR
+1600        LDA #$80     YES
+1610        STA VALTYP+1 FLAG INTEGER MODE
+1620        ORA VARNAM
+1630        STA VARNAM   SET SIGN BIT ON VARNAME
+1640 .5     TXA          SECOND CHAR OF NAME
+1650        ORA #$80     SET SIGN
+1660        TAX
+1670        JSR CHRGET   GET TERMINATING CHAR
+1680 .6     STX VARNAM+1 STORE SECOND CHAR OF NAME
+1690        SEC
+1700        ORA SUBFLG   $00 OR $40 IF SUBSCRIPTS OK, ELSE $80
+1710        SBC #'('     IF SUBFLG=$00 AND CHAR="("...
+1720        BNE .8       NOPE
+1730 .7     JMP ARRAY    YES
+1740 .8     BIT SUBFLG   CHECK TOP TWO BITS OF SUBFLG
+1750        BMI .9       $80
+1760        BVS .7       $40, CALLED FROM GETARYPT
+1770 .9     LDA #0       CLEAR SUBFLG
+1780        STA SUBFLG
+1790        LDA VARTAB   START LOWTR AT SIMPLE VARIABLE TABLE
+1800        LDX VARTAB+1
+1810        LDY #0
+1820 .10    STX LOWTR+1
+1830 .11    STA LOWTR
+1840        CPX ARYTAB+1  END OF SIMPLE VARIABLES?
+1850        BNE .12       NO, GO ON
+1860        CMP ARYTAB    YES; END OF ARRAYS?
+1870        BEQ NAME.NOT.FOUND    YES, MAKE ONE
+1880 .12    LDA VARNAM    SAME FIRST LETTER?
+1890        CMP (LOWTR),Y
+1900        BNE .13       NOT SAME FIRST LETTER
+1910        LDA VARNAM+1  SAME SECOND LETTER?
+1920        INY
+1930        CMP (LOWTR),Y
+1940        BEQ SET.VARPNT.AND.YA   YES, SAME VARIABLE NAME
+1950        DEY           NO, BUMP TO NEXT NAME
+1960 .13    CLC
+1970        LDA LOWTR
+1980        ADC #7
+1990        BCC .11
+2000        INX
+2010        BNE .10      ...ALWAYS
+2020 *--------------------------------
+2030 *      CHECK IF (A) IS ASCII LETTER A-Z
+2040 *
+2050 *      RETURN CARRY = 1 IF A-Z
+2060 *                   = 0 IF NOT
+2070 *
+2080 *      &lt;&lt;&lt;NOTE FASTER AND SHORTER CODE:    >>>
+2090 *      &lt;&lt;&lt;    CMP #'Z'+1  COMPARE HI END
+2100 *      &lt;&lt;&lt;    BCS .1      ABOVE A-Z
+2110 *      &lt;&lt;&lt;    CMP #'A'    COMPARE LO END
+2120 *      &lt;&lt;&lt;    RTS         C=0 IF LO, C=1 IF A-Z
+2130 *      &lt;&lt;&lt;.1  CLC         C=0 IF HI
+2140 *      &lt;&lt;&lt;    RTS
+2150 *--------------------------------
+2160 ISLETC CMP #'A'     COMPARE LO END
+2170        BCC .1       C=0 IF LOW
+2180        SBC #'Z'+1   PREPARE HI END TEST
+2190        SEC          TEST HI END, RESTORING (A)
+2200        SBC #-1-'Z'  C=0 IF LO, C=1 IF A-Z
+2210 .1     RTS
+2220 *--------------------------------
+2230 *      VARIABLE NOT FOUND, SO MAKE ONE
+2240 *--------------------------------
+2250 NAME.NOT.FOUND
+2260        PLA          LOOK AT RETURN ADDRESS ON STACK TO
+2270        PHA          SEE IF CALLED FROM FRM.VARIABLE
+2280        CMP #FRM.VARIABLE.CALL
+2290        BNE MAKE.NEW.VARIABLE   NO
+2300        TSX
+2310        LDA STACK+2,X
+2320        CMP /FRM.VARIABLE.CALL
+2330        BNE MAKE.NEW.VARIABLE   NO
+2340        LDA #C.ZERO  YES, CALLED FROM FRM.VARIABLE
+2350        LDY /C.ZERO  POINT TO A CONSTANT ZERO
+2360        RTS          NEW VARIABLE USED IN EXPRESSION = 0
+2370 *--------------------------------
+2380 C.ZERO .HS 0000     INTEGER OR REAL ZERO, OR NULL STRING
+2390 *--------------------------------
+2400 *      MAKE A NEW SIMPLE VARIABLE
+2410 *
+2420 *      MOVE ARRAYS UP 7 BYTES TO MAKE ROOM FOR NEW VARIABLE
+2430 *      ENTER 7-BYTE VARIABLE DATA IN THE HOLE
+2440 *--------------------------------
+2450 MAKE.NEW.VARIABLE
+2460        LDA ARYTAB   SET UP CALL TO BLTU TO
+2470        LDY ARYTAB+1    TO MOVE FROM ARYTAB THRU STREND-1
+2480        STA LOWTR       7 BYTES HIGHER
+2490        STY LOWTR+1
+2500        LDA STREND
+2510        LDY STREND+1
+2520        STA HIGHTR
+2530        STY HIGHTR+1
+2540        CLC
+2550        ADC #7
+2560        BCC .1
+2570        INY
+2580 .1     STA ARYPNT
+2590        STY ARYPNT+1
+2600        JSR BLTU     MOVE ARRAY BLOCK UP
+2610        LDA ARYPNT   STORE NEW START OF ARRAYS
+2620        LDY ARYPNT+1
+2630        INY
+2640        STA ARYTAB
+2650        STY ARYTAB+1
+2660        LDY #0
+2670        LDA VARNAM   FIRST CHAR OF NAME
+2680        STA (LOWTR),Y
+2690        INY
+2700        LDA VARNAM+1 SECOND CHAR OF NAME
+2710        STA (LOWTR),Y
+2720        LDA #0       SET FIVE-BYTE VALUE TO 0
+2730        INY
+2740        STA (LOWTR),Y
+2750        INY
+2760        STA (LOWTR),Y
+2770        INY
+2780        STA (LOWTR),Y
+2790        INY
+2800        STA (LOWTR),Y
+2810        INY
+2820        STA (LOWTR),Y
+2830 *--------------------------------
+2840 *      PUT ADDRESS OF VALUE OF VARIABLE IN VARPNT AND Y,A
+2850 *--------------------------------
+2860 SET.VARPNT.AND.YA
+2870        LDA LOWTR    LOWTR POINTS AT NAME OF VARIABLE,
+2880        CLC          SO ADD 2 TO GET TO VALUE
+2890        ADC #2
+2900        LDY LOWTR+1
+2910        BCC .1
+2920        INY
+2930 .1     STA VARPNT   ADDRESS IN VARPNT AND Y,A
+2940        STY VARPNT+1
+2950        RTS
+2960 *--------------------------------
+2970 *      COMPUTE ADDRESS OF FIRST VALUE IN ARRAY
+2980 *      ARYPNT = (LOWTR) + #DIMS*2 + 5
+2990 *--------------------------------
+3000 GETARY LDA NUMDIM   GET # OF DIMENSIONS
+3010 *--------------------------------
+3020 GETARY2
+3030        ASL          #DIMS*2 (SIZE OF EACH DIM IN 2 BYTES)
+3040        ADC #5       + 5 (2 FOR NAME, 2 FOR OFFSET TO NEXT
+3050 *                   ARRAY, AND 1 FOR #DIMS
+3060        ADC LOWTR    ADDRESS OF TH IS ARRAY IN ARYTAB
+3070        LDY LOWTR+1
+3080        BCC .1
+3090        INY
+3100 .1     STA ARYPNT   ADDRESS OF FIRST VALUE IN ARRAY
+3110        STY ARYPNT+1
+3120        RTS
+3130 *--------------------------------
+3140 NEG32768 .HS 90800000 -32768.00049 IN FLOATING POINT
+3150 * &lt;&lt;&lt;  MEANT TO BE -32768, WHICH WOULD BE 9080000000 >>>
+3160 * &lt;&lt;&lt;  1 BYTE SHORT, SO PICKS UP $20 FROM NEXT INSTRUCTION
+3170 *--------------------------------
+3180 *      EVALUATE NUMERIC FORMULA AT TXTPTR
+3190 *      CONVERTING RESULT TO INTEGER 0 &lt;= X &lt;= 32767
+3200 *      IN FAC+3,4
+3210 *--------------------------------
+3220 MAKINT JSR CHRGET
+3230        JSR FRMNUM
+3240 *--------------------------------
+3250 *      CONVERT FAC TO INTEGER
+3260 *      MUST BE POSITIVE AND LESS THAN 32768
+3270 *--------------------------------
+3280 MKINT  LDA FAC.SIGN   ERROR IF -
+3290        BMI MI1
+3300 *--------------------------------
+3310 *      CONVERT FAC TO INTEGER
+3320 *      MUST BE -32767 &lt;= FAC &lt;= 32767
+3330 *--------------------------------
+3340 AYINT  LDA FAC      EXPONENT OF VALUE IN FAC
+3350        CMP #$90     ABS(VALUE) &lt; 32768?
+3360        BCC MI2      YES, OK FOR INTEGER
+3370        LDA #NEG32768  NO; NEXT FEW LINES ARE SUPPOSED TO
+3380        LDY /NEG32768  ALLOW -32768 ($8000), BUT DO NOT!
+3390        JSR FCOMP    BECAUSE COMPARED TO -32768.00049
+3400 *      &lt;&lt;&lt; BUG:  A=-32768.00049:A%=A IS ACCEPTED >>>
+3410 *      &lt;&lt;&lt;       BUT PRINT A,A% SHOWS THAT       >>>
+3420 *      &lt;&lt;&lt;       A=-32768.0005 (OK), A%=32767    >>>
+3430 *      &lt;&lt;&lt;       WRONG! WRONG! WRONG!            >>>
+3440 *--------------------------------
+3450 MI1    BNE IQERR    ILLEGAL QUANTITY
+3460 MI2    JMP QINT     CONVERT TO INTEGER
+3470 *--------------------------------
+3480 *      LOCATE ARRAY ELEMENT OR CREATE AN ARRAY
+3490 *--------------------------------
+3500 ARRAY  LDA SUBFLG   SUBSCRIPTS GIVEN?
+3510        BNE .2       NO
+3520 *--------------------------------
+3530 *      PARSE THE SUBSCRIPT LIST
+3540 *--------------------------------
+3550        LDA DIMFLG   YES
+3560        ORA VALTYP+1  SET HIGH BIT IF %
+3570        PHA          SAVE VALTYP AND DIMFLG ON STACK
+3580        LDA VALTYP
+3590        PHA
+3600        LDY #0       COUNT # DIMENSIONS IN Y-REG
+3610 .1     TYA          SAVE #DIMS ON STACK
+3620        PHA
+3630        LDA VARNAM+1 SAVE VARIABLE NAME ON STACK
+3640        PHA
+3650        LDA VARNAM
+3660        PHA
+3670        JSR MAKINT   EVALUATE SUBSCRIPT AS INTEGER
+3680        PLA          RESTORE VARIABLE NAME
+3690        STA VARNAM
+3700        PLA
+3710        STA VARNAM+1
+3720        PLA          RESTORE # DIMS TO Y-REG
+3730        TAY
+3740        TSX          COPY VALTYP AND DIMFLG ON STACK
+3750        LDA STACK+2,X  TO LEAVE ROOM FOR THE SUBSCRIPT
+3760        PHA
+3770        LDA STACK+1,X
+3780        PHA
+3790        LDA FAC+3    GET SUBSCRIPT VALUE AND PLACE IN THE
+3800        STA STACK+2,X   STACK WHERE VALTYP &amp; DIMFLG WERE
+3810        LDA FAC+4
+3820        STA STACK+1,X
+3830        INY          COUNT THE SUBSCRIPT
+3840        JSR CHRGOT   NEXT CHAR
+3850        CMP #','
+3860        BEQ .1       COMMA, PARSE ANOTHER SUBSCRIPT
+3870        STY NUMDIM   NO MORE SUBSCRIPTS, SAVE #
+3880        JSR CHKCLS   NOW NEED ")"
+3890        PLA          RESTORE VALTYPE AND DIMFLG
+3900        STA VALTYP
+3910        PLA
+3920        STA VALTYP+1
+3930        AND #$7F         ISOLATE DIMFLG
+3940        STA DIMFLG
+3950 *--------------------------------
+3960 *      SEARCH ARRAY TABLE FOR THIS ARRAY NAME
+3970 *--------------------------------
+3980 .2     LDX ARYTAB   (A,X) = START OF ARRAY TABLE
+3990        LDA ARYTAB+1
+4000 .3     STX LOWTR    USE LOWTR FOR RUNNING POINTER
+4010        STA LOWTR+1
+4020        CMP STREND+1 DID WE REACH THE END OF ARRAYS YET?
+4030        BNE .4       NO, KEEP SEARCHING
+4040        CPX STREND
+4050        BEQ MAKE.NEW.ARRAY  YES, THIS IS A NEW ARRAY NAME
+4060 .4     LDY #0       POINT AT 1ST CHAR OF ARRAY NAME
+4070        LDA (LOWTR),Y     GET 1ST CHAR OF NAME
+4080        INY          POINT AT 2ND CHAR
+4090        CMP VARNAM   1ST CHAR SAME?
+4100        BNE .5       NO, MOVE TO NEXT ARRAY
+4110        LDA VARNAM+1 YES, TRY 2ND CHAR
+4120        CMP (LOWTR),Y     SAME?
+4130        BEQ USE.OLD.ARRAY YES, ARRAY FOUND
+4140 .5     INY          POINT AT OFFSET TO NEXT ARRAY
+4150        LDA (LOWTR),Y     ADD OFFSET TO RUNNING POINTER
+4160        CLC
+4170        ADC LOWTR
+4180        TAX
+4190        INY
+4200        LDA (LOWTR),Y
+4210        ADC LOWTR+1
+4220        BCC .3       ...ALWAYS
+4230 *--------------------------------
+4240 *      ERROR:  BAD SUBSCRIPTS
+4250 *--------------------------------
+4260 SUBERR LDX #ERR.BADSUBS
+4270        .HS 2C       TRICK TO SKIP NEXT LINE
+4280 *--------------------------------
+4290 *      ERROR:  ILLEGAL QUANTITY
+4300 *--------------------------------
+4310 IQERR  LDX #ERR.ILLQTY
+4320 JER    JMP ERROR
+4330 *--------------------------------
+4340 *      FOUND THE ARRAY
+4350 *--------------------------------
+4360 USE.OLD.ARRAY
+4370        LDX #ERR.REDIMD   SET UP FOR REDIM'D ARRAY ERROR
+4380        LDA DIMFLG        CALLED FROM "DIM" STATEMENT?
+4390        BNE JER           YES, ERROR
+4400        LDA SUBFLG        NO, CHECK IF ANY SUBSCRIPTS
+4410        BEQ .1            YES, NEED TO CHECK THE NUMBER
+4420        SEC               NO, SIGNAL ARRAY FOUND
+4430        RTS
+4440 *--------------------------------
+4450 .1     JSR GETARY     SET (ARYPNT) = ADDR OF FIRST ELEMENT
+4460        LDA NUMDIM        COMPARE NUMBER OF DIMENSIONS
+4470        LDY #4
+4480        CMP (LOWTR),Y
+4490        BNE SUBERR        NOT SAME, SUBSCRIPT ERROR
+4500        JMP FIND.ARRAY.ELEMENT
+4510 *--------------------------------
