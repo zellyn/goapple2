@@ -41,3 +41,14 @@ http://www.easy68k.com/paulrsm/6502/MEMMAP.HTM
 |              | add-on Apple sold that contains Integer BASIC utilities such as        |
 |              | high-resolution graphics support, renumber, append, tape verify,       |
 |              | music, and a RAM test. Complete source code is in the manual.          |
+
+* Misc
+
+DOS listing info:
+http://www.digibarn.com/collections/business-docs/apple-II-DOS/index.html
+
+Edasm docs
+ftp://ftp.apple.asimov.net/pub/apple_II/documentation/programming/6502assembly/Apple%206502%20Assembler-Editor.pdf
+
+Apple II Original ROM Information
+http://www.downloads.reactivemicro.com/Public/Users/David_Craig/Apple2OriginalROMInfo.TXT
