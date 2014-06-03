@@ -52,3 +52,8 @@ ftp://ftp.apple.asimov.net/pub/apple_II/documentation/programming/6502assembly/A
 
 Apple II Original ROM Information
 http://www.downloads.reactivemicro.com/Public/Users/David_Craig/Apple2OriginalROMInfo.TXT
+
+* Differences found
+The autostart ROM listing has $FFFE:FFFF pointing to IRQ ($FA40).
+The apple2+.rom file I have points to $FF59 (OLDRST).
+
