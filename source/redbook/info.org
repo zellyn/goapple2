@@ -5,24 +5,17 @@
 * Memory map of the Apple II ROMs
 http://www.easy68k.com/paulrsm/6502/MEMMAP.HTM
 
-| + | $F800-$FFFF  | Monitor. Handles screen I/O and keyboard input. Also has a             |
-|   | monitor.asm  | disassembler, memory dump, memory move, memory compare, step and trace |
-|   |              | functions, lo-res graphics routines, multiply and divide routines, and |
-|   |              | more. This monitor has the cleanest code of all the Apple II           |
-|   |              | monitors. Every one after this had to patch the monitor to add         |
-|   |              | functions while still remaining (mostly) compatible. Complete source   |
-|   |              | code is in the manual.                                                 |
+|   | $D000-D7FF   | Programmer's Aid #1--missing from the original Apple II, this is a ROM |
+|   |              | add-on Apple sold that contains Integer BASIC utilities such as        |
+|   |              | high-resolution graphics support, renumber, append, tape verify,       |
+|   |              | music, and a RAM test. Complete source code is in the manual.          | 
 |   |              |                                                                        |
-| + | $F689-F7FC   | Sweet-16 interpreter. Sweet-16 code has been benchmarked to be about   |
-|   | sweet16.asm  | half the size of pure 6502 code but 5-8 times slower. The renumber     |
-|   |              | routine in the Programmer's Aid #1 is written in Sweet-16, where small |
-|   |              | size was much more important than speed. Complete source code is in    |
-|   |              | the manual.                                                            |
+|   | $D800-DFFF   | Empty ROM socket. There was at least one third party ROM add-on.       |
 |   |              |                                                                        |
-| + | $F500-F63C   | Mini-assembler. This lets you type in assembly code, one line at a     |
-|   | $F666-F668   | time, and it will assemble the proper bytes. No labels or equates are  |
-|   | miniasm.asm  | supported--it is a MINI assembler. Complete source code is in the      |
-|   |              | manual.                                                                |
+|   | $E000-F424   | Integer BASIC by Woz (Steve Wozniak, creator of the Apple II). "That   |
+|   | intbasic.asm | BASIC, which we shipped with the first Apple II's, was never           |
+|   |              | assembled--ever. There was one handwritten copy, all handwritten, all  |
+|   |              | hand assembled." Woz, October 1984.                                    |
 |   |              |                                                                        |
 | + | $F425-F4FB   | Floating point routines. Woz's first plans for his 6502 BASIC included |
 |   | $F63D-F65D   | floating point, but he abandoned them when he realized he could finish |
@@ -30,17 +23,64 @@ http://www.easy68k.com/paulrsm/6502/MEMMAP.HTM
 |   |              | they are not called from anywhere. Complete source code is in the      |
 |   |              | manual.                                                                |
 |   |              |                                                                        |
-|   | $E000-F424   | Integer BASIC by Woz (Steve Wozniak, creator of the Apple II). "That   |
-|   | intbasic.asm | BASIC, which we shipped with the first Apple II's, was never           |
-|   |              | assembled--ever. There was one handwritten copy, all handwritten, all  |
-|   |              | hand assembled." Woz, October 1984.                                    |
+| + | $F500-F63C   | Mini-assembler. This lets you type in assembly code, one line at a     |
+|   | $F666-F668   | time, and it will assemble the proper bytes. No labels or equates are  |
+|   | miniasm.asm  | supported--it is a MINI assembler. Complete source code is in the      |
+|   |              | manual.                                                                |
 |   |              |                                                                        |
-|   | $D800-DFFF   | Empty ROM socket. There was at least one third party ROM add-on.       |
+| + | $F689-F7FC   | Sweet-16 interpreter. Sweet-16 code has been benchmarked to be about   |
+|   | sweet16.asm  | half the size of pure 6502 code but 5-8 times slower. The renumber     |
+|   |              | routine in the Programmer's Aid #1 is written in Sweet-16, where small |
+|   |              | size was much more important than speed. Complete source code is in    |
+|   |              | the manual.                                                            |
 |   |              |                                                                        |
-|   | $D000-D7FF   | Programmer's Aid #1--missing from the original Apple II, this is a ROM |
-|   |              | add-on Apple sold that contains Integer BASIC utilities such as        |
-|   |              | high-resolution graphics support, renumber, append, tape verify,       |
-|   |              | music, and a RAM test. Complete source code is in the manual.          |
+| + | $F800-$FFFF  | Monitor. Handles screen I/O and keyboard input. Also has a             |
+|   | monitor.asm  | disassembler, memory dump, memory move, memory compare, step and trace |
+|   |              | functions, lo-res graphics routines, multiply and divide routines, and |
+|   |              | more. This monitor has the cleanest code of all the Apple II           |
+|   |              | monitors. Every one after this had to patch the monitor to add         |
+|   |              | functions while still remaining (mostly) compatible. Complete source   |
+|   |              | code is in the manual.                                                 |
+
+| E000-F424 |    | intbasic                    |
+| F425-F4FB |    | fp (1)                      |
+| F4FC-F4FF |  4 | ? - FF FF FF FF             |
+| F500-F63C |    | miniasm (1)                 |
+| F63D-F65D |    | fp (2)                      |
+| F65E-F665 |  8 | ? - FF FF FF FF FF FF FF FF |
+| F666-F668 |    | miniasm (2)                 |
+| F669-F688 | 32 | ?  - see below              |
+| F689-F7FC |    | sweet16                     |
+| F7FD-F7FF |  3 | ? F6 FF FF                  |
+| F800-FFFF |    | monitor                     |
+
+** F669-F688
+
+F669-   84 58       STY   $58
+F66B-   86 57       STX   $57
+F66D-   85 56       STA   $56
+F66F-   08          PHP
+F670-   68          PLA
+F671-   85 59       STA   $59
+F673-   BA          TSX
+F674-   E8          INX
+F675-   E8          INX
+F676-   BD 00 01    LDA   $0100,X
+F679-   0A          ASL
+F67A-   0A          ASL
+F67B-   0A          ASL
+F67C-   0A          ASL
+F67D-   60          RTS
+F67E-   A4 58       LDY   $58
+F680-   A6 57       LDX   $57
+F682-   A5 59       LDA   $59
+F684-   48          PHA
+F685-   A5 56       LDA   $56
+F687-   28          PLP
+F688-   60          RTS
+
+
+  
 
 * Misc
 
@@ -52,6 +92,10 @@ ftp://ftp.apple.asimov.net/pub/apple_II/documentation/programming/6502assembly/A
 
 Apple II Original ROM Information
 http://www.downloads.reactivemicro.com/Public/Users/David_Craig/Apple2OriginalROMInfo.TXT
+
+Complete sources:
+http://mosher.mine.nu/apple2/site/
+
 
 * Differences found
 The autostart ROM listing has $FFFE:FFFF pointing to IRQ ($FA40).
