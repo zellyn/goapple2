@@ -1,0 +1,6 @@
+    10   * Macros used by intbasic.asm
+    20   INCW     MAC
+    30            INC ]1
+    40            BNE INCW_END
+    50            INC ]1+1
+    60   INCW_END EOM
