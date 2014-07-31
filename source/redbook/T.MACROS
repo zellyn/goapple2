@@ -1,6 +1,33 @@
-    10   * Macros used by intbasic.asm
-    20   INCW     MAC
-    30            INC ]1
-    40            BNE INCW_END
-    50            INC ]1+1
-    60   INCW_END EOM
+    10  * Macros used by intbasic.asm
+    20  INCW     MAC
+    30           INC ]1
+    40           BNE INCW_END
+    50           INC ]1+1
+    60  INCW_END EOM
+    70  MOVW     MAC
+    80           LDA ]1
+    90           STA ]2
+   100           LDA ]1+1
+   110           STA ]2+1
+   120           EOM
+   130  ADDW     MAC
+   140           CLC
+   150           LDA ]1
+   160           ADC ]2
+   170           STA ]3
+   180           LDA ]1+1
+   190           ADC ]2+1
+   200           STA ]3+1
+   210           EOM
+   220  CMPW     MAC
+   230           LDA ]1
+   240           CMP ]2
+   250           LDA ]1+1
+   260           SBC ]2+1
+   270           EOM
+   280  DECW     MAC
+   290           LDA ]1
+   300           BNE DECW_1
+   310           DEC ]1+1
+   320  DECW_1   DEC ]1
+   330           EOM
