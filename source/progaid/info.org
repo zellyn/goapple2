@@ -1,0 +1,46 @@
+* Integer basic ROM D0 and D8 contents:
+
+Information on contents of INTBASIC file, version changes, etc:
+http://apple2history.org/history/ah15/
+
+Information on programmer's aid, and INTBASIC file, including the fact
+that the D8 area was filled (uselessly) with the D8 part of the
+FPBASIC file: http://apple2history.org/history/ah03/
+
+Bitmap scan PDF:
+ftp://ftp.apple.asimov.net/pub/apple_II/documentation/programming/6502assembly/Apple%20II%20Programmer's%20Aid%201_alt.pdf
+OCR'd (badly) PDF:
+http://www.classiccmp.org/cini/pdf/Apple/Apple%20Programmers%20Aid%20Book.pdf
+
+* Layout
+
+| hires     | High-Resolution Graphics       | $D000-$D3FF | Gap from $D340-D38F? |
+| renumapp  | Renumber                       | $D400-$D4BB |                      |
+|           | Append                         | $D4BC-$D4D4 |                      |
+|           |                                | $D4D5-$D4DB |                      |
+| relocate  | Relocate                       | $D4DC-$D52D |                      |
+|           |                                | $D52E-$D534 |                      |
+| verify    | Tape Verify (BASIC)            | $D535-$D553 |                      |
+|           | Tape Verify (6502 Code & Data) | $D554-$D5AA |                      |
+|           |                                | $D5AB-$D5BB |                      |
+| ramtest   | RAM Test                       | $D5BC-$D691 |                      |
+|           |                                | $D692-$D716 |                      |
+| music     | Music                          | $D717-$D7F8 |                      |
+
+** script generator
+
+parts = [
+  ('hires',     0xD000, 0xD3FF),
+  ('renumapp',  0xD400, 0xD4D4),
+  ('relocate',  0xD4DC, 0xD52D),
+  ('verify',    0xD535, 0xD5AA),
+  ('ramtest',   0xD5BC, 0xD691),
+  ('music',     0xD717, 0xD7F8),
+]
+
+for name, start, end in parts:
+  tail = 0x10000 - start
+  length = end - start + 1
+  print 'tail -c %d ../../apple2.orig.rom | head -c %d > %s.rom' % (tail, length, name)
+
+
