@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"image"
+	"image/color"
 	"log"
 	"os"
 	"runtime"
@@ -16,7 +17,6 @@ import (
 	"github.com/zellyn/go6502/cpu"
 	"github.com/zellyn/goapple2"
 	"github.com/zellyn/goapple2/cards"
-	"github.com/zellyn/goapple2/disk"
 	"github.com/zellyn/goapple2/util"
 	"github.com/zellyn/goapple2/videoscan"
 )
@@ -47,6 +47,7 @@ func RunEmulator(s screen.Screen) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer b.Release()
 
 	rom := util.ReadRomOrDie("../data/roms/apple2+.rom")
 	// charRom = util.ReadFullCharacterRomOrDie("../data/roms/apple2char.rom")
@@ -56,7 +57,7 @@ func RunEmulator(s screen.Screen) {
 		a2.Done = a2.Done || ProcessEvents(a2)
 		runtime.Gosched()
 	}
-	plotter := ShinyPlotter{b, oncePerFrame}
+	plotter := ShinyPlotter{w, b, oncePerFrame}
 	a2 = goapple2.NewApple2(plotter, rom, charRom)
 
 	intBasicRom := util.ReadRomOrDie("../data/roms/apple2.rom")
@@ -78,11 +79,13 @@ func RunEmulator(s screen.Screen) {
 	}
 	// disk1, err := disk.DiskFromFile("../data/disks/spedtest.dsk", 0)
 	// disk1, err := disk.DiskFromFile("../data/disks/dung_beetles.dsk", 0)
-	disk1, err := disk.DiskFromFile("../data/disks/chivalry.dsk", 0)
-	if err != nil {
-		log.Fatal(err)
-	}
-	diskCard.LoadDisk(disk1, 0)
+	/*
+		disk1, err := disk.DiskFromFile("../data/disks/chivalry.dsk", 0)
+		if err != nil {
+			log.Fatal(err)
+		}
+		diskCard.LoadDisk(disk1, 0)
+	*/
 
 	steps := *steplimit
 
@@ -142,7 +145,10 @@ func RunEmulator(s screen.Screen) {
 	a2.Quit()
 }
 
-func plot(x, y uint, color uint32, b screen.Buffer) {
+func plot(x, y int, c color.RGBA, b screen.Buffer) {
+	rgba := b.RGBA()
+	rgba.SetRGBA(x+BORDER_W, y+BORDER_H, c)
+
 	/*
 		x = x + BORDER_W
 		y = y + BORDER_H
@@ -326,20 +332,21 @@ func ProcessEvents(a2 *goapple2.Apple2) (done bool) {
 }
 
 type ShinyPlotter struct {
+	window       screen.Window
 	buffer       screen.Buffer
 	oncePerFrame func()
 }
 
 func (s ShinyPlotter) Plot(pd videoscan.PlotData) {
-	y := uint(pd.Row)
-	x := uint(pd.Column) * 14
+	y := int(pd.Row)
+	x := int(pd.Column) * 14
 	data := pd.Data
-	for i := uint(0); i < 14; i++ {
-		color1 := uint32(0)
-		color2 := uint32(0)
+	for i := 0; i < 14; i++ {
+		color1 := color.RGBA{0, 0, 0, 0xff}
+		color2 := color.RGBA{0, 0, 0, 0xff}
 		if data&1 > 0 {
-			color1 = 0x00ff00
-			color2 = 0x008800
+			color1 = color.RGBA{0x00, 0xff, 0x00, 0xff}
+			color2 = color.RGBA{0x00, 0x88, 0x00, 0xff}
 		}
 		plot(x+i, y*2+0, color1, s.buffer)
 		plot(x+i, y*2+1, color2, s.buffer)
@@ -348,6 +355,8 @@ func (s ShinyPlotter) Plot(pd videoscan.PlotData) {
 }
 
 func (s ShinyPlotter) OncePerFrame() {
+	s.window.Upload(image.Point{0, 0}, s.buffer, s.buffer.Bounds())
+	s.window.Publish()
 	s.oncePerFrame()
 }
 
