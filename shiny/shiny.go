@@ -13,6 +13,8 @@ import (
 
 	"golang.org/x/exp/shiny/driver"
 	"golang.org/x/exp/shiny/screen"
+	"golang.org/x/mobile/event/key"
+	"golang.org/x/mobile/event/lifecycle"
 
 	"github.com/zellyn/go6502/cpu"
 	"github.com/zellyn/goapple2"
@@ -36,6 +38,12 @@ const (
 
 // Run the emulator
 func RunEmulator(s screen.Screen) {
+	rom := util.ReadRomOrDie("../data/roms/apple2+.rom")
+	// charRom = util.ReadFullCharacterRomOrDie("../data/roms/apple2char.rom")
+	charRom := util.ReadSmallCharacterRomOrDie("../data/roms/apple2-chars.rom")
+	intBasicRom := util.ReadRomOrDie("../data/roms/apple2.rom")
+
+	eventChan := make(chan (interface{}))
 	w, err := s.NewWindow(&screen.NewWindowOptions{Width: SCREEN_WIDTH, Height: SCREEN_HEIGHT})
 	if err != nil {
 		log.Fatal(err)
@@ -49,18 +57,14 @@ func RunEmulator(s screen.Screen) {
 	}
 	defer b.Release()
 
-	rom := util.ReadRomOrDie("../data/roms/apple2+.rom")
-	// charRom = util.ReadFullCharacterRomOrDie("../data/roms/apple2char.rom")
-	charRom := util.ReadSmallCharacterRomOrDie("../data/roms/apple2-chars.rom")
 	var a2 *goapple2.Apple2
 	oncePerFrame := func() {
-		a2.Done = a2.Done || ProcessEvents(a2)
+		a2.Done = a2.Done || ProcessEvents(a2, w, eventChan)
 		runtime.Gosched()
 	}
 	plotter := ShinyPlotter{w, b, oncePerFrame}
 	a2 = goapple2.NewApple2(plotter, rom, charRom)
 
-	intBasicRom := util.ReadRomOrDie("../data/roms/apple2.rom")
 	firmwareCard, err := cards.NewFirmwareCard(intBasicRom, "Intbasic Firmware Card", 0, a2)
 	if err != nil {
 		panic(err)
@@ -69,23 +73,24 @@ func RunEmulator(s screen.Screen) {
 		log.Fatal(err)
 	}
 
-	diskCardRom := util.ReadRomOrDie("../data/roms/Apple Disk II 16 Sector Interface Card ROM P5 - 341-0027.bin")
-	diskCard, err := cards.NewDiskCard(diskCardRom, 6, a2)
-	if err != nil {
-		panic(err)
-	}
-	if err := a2.AddCard(diskCard); err != nil {
-		log.Fatal(err)
-	}
+	/*
+		diskCardRom := util.ReadRomOrDie("../data/roms/Apple Disk II 16 Sector Interface Card ROM P5 - 341-0027.bin")
+		diskCard, err := cards.NewDiskCard(diskCardRom, 6, a2)
+		if err != nil {
+			panic(err)
+		}
+			if err := a2.AddCard(diskCard); err != nil {
+				log.Fatal(err)
+			}
+	*/
 	// disk1, err := disk.DiskFromFile("../data/disks/spedtest.dsk", 0)
 	// disk1, err := disk.DiskFromFile("../data/disks/dung_beetles.dsk", 0)
-	/*
-		disk1, err := disk.DiskFromFile("../data/disks/chivalry.dsk", 0)
-		if err != nil {
-			log.Fatal(err)
-		}
-		diskCard.LoadDisk(disk1, 0)
-	*/
+	// disk1, err := disk.DiskFromFile("../data/disks/chivalry.dsk", 0)
+	// disk1, err := disk.DiskFromFile("../data/disks/wavynavy.dsk", 0)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// diskCard.LoadDisk(disk1, 0)
 
 	steps := *steplimit
 
@@ -128,6 +133,12 @@ func RunEmulator(s screen.Screen) {
 
 	// go typeProgram(a2)
 
+	go func() {
+		for {
+			eventChan <- w.NextEvent()
+		}
+	}()
+
 	for !a2.Done {
 		err := a2.Step()
 		if err != nil {
@@ -159,152 +170,190 @@ func plot(x, y int, c color.RGBA, b screen.Buffer) {
 	*/
 }
 
-/*
-const (
-	M_NONE = iota
-	M_SHIFT_OR_NONE
-	M_SHIFT
-	M_CTRL
-	M_ANY
-)
-
 type Key struct {
-	sym uint32
-	mod uint32
+	code key.Code
+	mod  key.Modifiers
 }
 
 var KeyToApple = map[Key]byte{
-	Key{sdl.K_a, M_SHIFT_OR_NONE}: 'A',
-	Key{sdl.K_b, M_SHIFT_OR_NONE}: 'B',
-	Key{sdl.K_c, M_SHIFT_OR_NONE}: 'C',
-	Key{sdl.K_d, M_SHIFT_OR_NONE}: 'D',
-	Key{sdl.K_e, M_SHIFT_OR_NONE}: 'E',
-	Key{sdl.K_f, M_SHIFT_OR_NONE}: 'F',
-	Key{sdl.K_g, M_SHIFT_OR_NONE}: 'G',
-	Key{sdl.K_h, M_SHIFT_OR_NONE}: 'H',
-	Key{sdl.K_i, M_SHIFT_OR_NONE}: 'I',
-	Key{sdl.K_j, M_SHIFT_OR_NONE}: 'J',
-	Key{sdl.K_k, M_SHIFT_OR_NONE}: 'K',
-	Key{sdl.K_l, M_SHIFT_OR_NONE}: 'L',
-	Key{sdl.K_m, M_SHIFT_OR_NONE}: 'M',
-	Key{sdl.K_n, M_SHIFT_OR_NONE}: 'N',
-	Key{sdl.K_o, M_SHIFT_OR_NONE}: 'O',
-	Key{sdl.K_p, M_SHIFT_OR_NONE}: 'P',
-	Key{sdl.K_q, M_SHIFT_OR_NONE}: 'Q',
-	Key{sdl.K_r, M_SHIFT_OR_NONE}: 'R',
-	Key{sdl.K_s, M_SHIFT_OR_NONE}: 'S',
-	Key{sdl.K_t, M_SHIFT_OR_NONE}: 'T',
-	Key{sdl.K_u, M_SHIFT_OR_NONE}: 'U',
-	Key{sdl.K_v, M_SHIFT_OR_NONE}: 'V',
-	Key{sdl.K_w, M_SHIFT_OR_NONE}: 'W',
-	Key{sdl.K_x, M_SHIFT_OR_NONE}: 'X',
-	Key{sdl.K_y, M_SHIFT_OR_NONE}: 'Y',
-	Key{sdl.K_z, M_SHIFT_OR_NONE}: 'Z',
+	Key{key.CodeA, 0}: 'A',
+	Key{key.CodeB, 0}: 'B',
+	Key{key.CodeC, 0}: 'C',
+	Key{key.CodeD, 0}: 'D',
+	Key{key.CodeE, 0}: 'E',
+	Key{key.CodeF, 0}: 'F',
+	Key{key.CodeG, 0}: 'G',
+	Key{key.CodeH, 0}: 'H',
+	Key{key.CodeI, 0}: 'I',
+	Key{key.CodeJ, 0}: 'J',
+	Key{key.CodeK, 0}: 'K',
+	Key{key.CodeL, 0}: 'L',
+	Key{key.CodeM, 0}: 'M',
+	Key{key.CodeN, 0}: 'N',
+	Key{key.CodeO, 0}: 'O',
+	Key{key.CodeP, 0}: 'P',
+	Key{key.CodeQ, 0}: 'Q',
+	Key{key.CodeR, 0}: 'R',
+	Key{key.CodeS, 0}: 'S',
+	Key{key.CodeT, 0}: 'T',
+	Key{key.CodeU, 0}: 'U',
+	Key{key.CodeV, 0}: 'V',
+	Key{key.CodeW, 0}: 'W',
+	Key{key.CodeX, 0}: 'X',
+	Key{key.CodeY, 0}: 'Y',
+	Key{key.CodeZ, 0}: 'Z',
 
-	Key{sdl.K_a, M_CTRL}: 1,
-	Key{sdl.K_b, M_CTRL}: 2,
-	Key{sdl.K_c, M_CTRL}: 3,
-	Key{sdl.K_d, M_CTRL}: 4,
-	Key{sdl.K_e, M_CTRL}: 5,
-	Key{sdl.K_f, M_CTRL}: 6,
-	Key{sdl.K_g, M_CTRL}: 7,
-	Key{sdl.K_h, M_CTRL}: 8,
-	Key{sdl.K_i, M_CTRL}: 9,
-	Key{sdl.K_j, M_CTRL}: 10,
-	Key{sdl.K_k, M_CTRL}: 11,
-	Key{sdl.K_l, M_CTRL}: 12,
-	Key{sdl.K_m, M_CTRL}: 13,
-	Key{sdl.K_n, M_CTRL}: 14,
-	Key{sdl.K_o, M_CTRL}: 15,
-	Key{sdl.K_p, M_CTRL}: 16,
-	Key{sdl.K_q, M_CTRL}: 17,
-	Key{sdl.K_r, M_CTRL}: 18,
-	Key{sdl.K_s, M_CTRL}: 19,
-	Key{sdl.K_t, M_CTRL}: 20,
-	Key{sdl.K_u, M_CTRL}: 21,
-	Key{sdl.K_v, M_CTRL}: 22,
-	Key{sdl.K_w, M_CTRL}: 23,
-	Key{sdl.K_x, M_CTRL}: 24,
-	Key{sdl.K_y, M_CTRL}: 25,
-	Key{sdl.K_z, M_CTRL}: 26,
+	Key{key.CodeA, key.ModShift}: 'A',
+	Key{key.CodeB, key.ModShift}: 'B',
+	Key{key.CodeC, key.ModShift}: 'C',
+	Key{key.CodeD, key.ModShift}: 'D',
+	Key{key.CodeE, key.ModShift}: 'E',
+	Key{key.CodeF, key.ModShift}: 'F',
+	Key{key.CodeG, key.ModShift}: 'G',
+	Key{key.CodeH, key.ModShift}: 'H',
+	Key{key.CodeI, key.ModShift}: 'I',
+	Key{key.CodeJ, key.ModShift}: 'J',
+	Key{key.CodeK, key.ModShift}: 'K',
+	Key{key.CodeL, key.ModShift}: 'L',
+	Key{key.CodeM, key.ModShift}: 'M',
+	Key{key.CodeN, key.ModShift}: 'N',
+	Key{key.CodeO, key.ModShift}: 'O',
+	Key{key.CodeP, key.ModShift}: 'P',
+	Key{key.CodeQ, key.ModShift}: 'Q',
+	Key{key.CodeR, key.ModShift}: 'R',
+	Key{key.CodeS, key.ModShift}: 'S',
+	Key{key.CodeT, key.ModShift}: 'T',
+	Key{key.CodeU, key.ModShift}: 'U',
+	Key{key.CodeV, key.ModShift}: 'V',
+	Key{key.CodeW, key.ModShift}: 'W',
+	Key{key.CodeX, key.ModShift}: 'X',
+	Key{key.CodeY, key.ModShift}: 'Y',
+	Key{key.CodeZ, key.ModShift}: 'Z',
 
-	Key{sdl.K_0, M_NONE}: '0',
-	Key{sdl.K_1, M_NONE}: '1',
-	Key{sdl.K_2, M_NONE}: '2',
-	Key{sdl.K_3, M_NONE}: '3',
-	Key{sdl.K_4, M_NONE}: '4',
-	Key{sdl.K_5, M_NONE}: '5',
-	Key{sdl.K_6, M_NONE}: '6',
-	Key{sdl.K_7, M_NONE}: '7',
-	Key{sdl.K_8, M_NONE}: '8',
-	Key{sdl.K_9, M_NONE}: '9',
+	Key{key.CodeA, key.ModControl}: 1,
+	Key{key.CodeB, key.ModControl}: 2,
+	Key{key.CodeC, key.ModControl}: 3,
+	Key{key.CodeD, key.ModControl}: 4,
+	Key{key.CodeE, key.ModControl}: 5,
+	Key{key.CodeF, key.ModControl}: 6,
+	Key{key.CodeG, key.ModControl}: 7,
+	Key{key.CodeH, key.ModControl}: 8,
+	Key{key.CodeI, key.ModControl}: 9,
+	Key{key.CodeJ, key.ModControl}: 10,
+	Key{key.CodeK, key.ModControl}: 11,
+	Key{key.CodeL, key.ModControl}: 12,
+	Key{key.CodeM, key.ModControl}: 13,
+	Key{key.CodeN, key.ModControl}: 14,
+	Key{key.CodeO, key.ModControl}: 15,
+	Key{key.CodeP, key.ModControl}: 16,
+	Key{key.CodeQ, key.ModControl}: 17,
+	Key{key.CodeR, key.ModControl}: 18,
+	Key{key.CodeS, key.ModControl}: 19,
+	Key{key.CodeT, key.ModControl}: 20,
+	Key{key.CodeU, key.ModControl}: 21,
+	Key{key.CodeV, key.ModControl}: 22,
+	Key{key.CodeW, key.ModControl}: 23,
+	Key{key.CodeX, key.ModControl}: 24,
+	Key{key.CodeY, key.ModControl}: 25,
+	Key{key.CodeZ, key.ModControl}: 26,
 
-	Key{sdl.K_1, M_SHIFT}: '!',
-	Key{sdl.K_2, M_SHIFT}: '@',
-	Key{sdl.K_3, M_SHIFT}: '#',
-	Key{sdl.K_4, M_SHIFT}: '$',
-	Key{sdl.K_5, M_SHIFT}: '%',
-	Key{sdl.K_6, M_SHIFT}: '^',
-	Key{sdl.K_7, M_SHIFT}: '&',
-	Key{sdl.K_8, M_SHIFT}: '*',
-	Key{sdl.K_9, M_SHIFT}: '(',
-	Key{sdl.K_0, M_SHIFT}: ')',
+	Key{key.Code0, 0}: '0',
+	Key{key.Code1, 0}: '1',
+	Key{key.Code2, 0}: '2',
+	Key{key.Code3, 0}: '3',
+	Key{key.Code4, 0}: '4',
+	Key{key.Code5, 0}: '5',
+	Key{key.Code6, 0}: '6',
+	Key{key.Code7, 0}: '7',
+	Key{key.Code8, 0}: '8',
+	Key{key.Code9, 0}: '9',
 
-	Key{sdl.K_MINUS, M_NONE}:        '-',
-	Key{sdl.K_MINUS, M_SHIFT}:       '_',
-	Key{sdl.K_EQUALS, M_NONE}:       '=',
-	Key{sdl.K_EQUALS, M_SHIFT}:      '+',
-	Key{sdl.K_LEFTBRACKET, M_NONE}:  '[',
-	Key{sdl.K_RIGHTBRACKET, M_NONE}: ']',
-	Key{sdl.K_SEMICOLON, M_NONE}:    ';',
-	Key{sdl.K_SEMICOLON, M_SHIFT}:   ':',
-	Key{sdl.K_QUOTE, M_NONE}:        '\'',
-	Key{sdl.K_QUOTE, M_SHIFT}:       '"',
-	Key{sdl.K_COMMA, M_NONE}:        ',',
-	Key{sdl.K_COMMA, M_SHIFT}:       '<',
-	Key{sdl.K_PERIOD, M_NONE}:       '.',
-	Key{sdl.K_PERIOD, M_SHIFT}:      '>',
-	Key{sdl.K_SLASH, M_NONE}:        '/',
-	Key{sdl.K_SLASH, M_SHIFT}:       '?',
-	Key{sdl.K_BACKSLASH, M_NONE}:    '\\',
+	Key{key.Code1, key.ModShift}: '!',
+	Key{key.Code2, key.ModShift}: '@',
+	Key{key.Code3, key.ModShift}: '#',
+	Key{key.Code4, key.ModShift}: '$',
+	Key{key.Code5, key.ModShift}: '%',
+	Key{key.Code6, key.ModShift}: '^',
+	Key{key.Code7, key.ModShift}: '&',
+	Key{key.Code8, key.ModShift}: '*',
+	Key{key.Code9, key.ModShift}: '(',
+	Key{key.Code0, key.ModShift}: ')',
 
-	Key{sdl.K_SPACE, M_SHIFT_OR_NONE}: ' ',
-	Key{sdl.K_RETURN, M_ANY}:          13,
+	Key{key.CodeHyphenMinus, 0}:            '-',
+	Key{key.CodeHyphenMinus, key.ModShift}: '_',
+	Key{key.CodeEqualSign, 0}:              '=',
+	Key{key.CodeEqualSign, key.ModShift}:   '+',
+	Key{key.CodeLeftSquareBracket, 0}:      '[',
+	Key{key.CodeRightSquareBracket, 0}:     ']',
+	Key{key.CodeSemicolon, 0}:              ';',
+	Key{key.CodeSemicolon, key.ModShift}:   ':',
+	Key{key.CodeApostrophe, 0}:             '\'',
+	Key{key.CodeApostrophe, key.ModShift}:  '"',
+	Key{key.CodeComma, 0}:                  ',',
+	Key{key.CodeComma, key.ModShift}:       '<',
+	Key{key.CodeFullStop, key.ModShift}:    '>',
+	Key{key.CodeSlash, 0}:                  '/',
+	Key{key.CodeSlash, key.ModShift}:       '?',
+	Key{key.CodeBackslash, 0}:              '\\',
 
-	Key{sdl.K_BACKSPACE, M_ANY}: 8,
-	Key{sdl.K_LEFT, M_ANY}:      8,
-	Key{sdl.K_RIGHT, M_ANY}:     21,
+	Key{key.CodeSpacebar, 0}:    ' ',
+	Key{key.CodeReturnEnter, 0}: 13,
+
+	Key{key.CodeDeleteBackspace, 0}: 8,
+	Key{key.CodeLeftArrow, 0}:       8,
+	Key{key.CodeRightArrow, 0}:      21,
 }
 
-func sdlToAppleKeyboard(k sdl.Keysym) (key byte, err error) {
-	if b, ok := KeyToApple[Key{k.Sym, M_ANY}]; ok {
+func shinyToAppleKeyboard(e key.Event) (byte, error) {
+	if b, ok := KeyToApple[Key{e.Code, e.Modifiers}]; ok {
 		return b, nil
 	}
-	switch k.Mod {
-	case sdl.KMOD_NONE:
-		if b, ok := KeyToApple[Key{k.Sym, M_NONE}]; ok {
-			return b, nil
+	/*
+		switch k.Mod {
+		case sdl.KMOD_NONE:
+			if b, ok := KeyToApple[Key{e.Code, 0}]; ok {
+				return b, nil
+			}
+			if b, ok := KeyToApple[Key{e.Code, M_SHIFT_OR_NONE}]; ok {
+				return b, nil
+			}
+		case sdl.KMOD_LSHIFT, sdl.KMOD_RSHIFT, sdl.KMOD_LSHIFT | sdl.KMOD_RSHIFT:
+			if b, ok := KeyToApple[Key{e.Code, M_SHIFT}]; ok {
+				return b, nil
+			}
+			if b, ok := KeyToApple[Key{e.Code, M_SHIFT_OR_NONE}]; ok {
+				return b, nil
+			}
+		case sdl.KMOD_LCTRL, sdl.KMOD_RCTRL, sdl.KMOD_LCTRL | sdl.KMOD_RCTRL:
+			if b, ok := KeyToApple[Key{e.Code, M_CTRL}]; ok {
+				return b, nil
+			}
 		}
-		if b, ok := KeyToApple[Key{k.Sym, M_SHIFT_OR_NONE}]; ok {
-			return b, nil
-		}
-	case sdl.KMOD_LSHIFT, sdl.KMOD_RSHIFT, sdl.KMOD_LSHIFT | sdl.KMOD_RSHIFT:
-		if b, ok := KeyToApple[Key{k.Sym, M_SHIFT}]; ok {
-			return b, nil
-		}
-		if b, ok := KeyToApple[Key{k.Sym, M_SHIFT_OR_NONE}]; ok {
-			return b, nil
-		}
-	case sdl.KMOD_LCTRL, sdl.KMOD_RCTRL, sdl.KMOD_LCTRL | sdl.KMOD_RCTRL:
-		if b, ok := KeyToApple[Key{k.Sym, M_CTRL}]; ok {
-			return b, nil
-		}
-	}
+	*/
 	return 0, fmt.Errorf("hi")
 }
-*/
 
-func ProcessEvents(a2 *goapple2.Apple2) (done bool) {
+func ProcessEvents(a2 *goapple2.Apple2, w screen.Window, eventChan chan interface{}) (done bool) {
+	select {
+	case ev := <-eventChan:
+		switch e := ev.(type) {
+		case lifecycle.Event:
+			if e.To == lifecycle.StageDead {
+				return true
+			}
+		case key.Event:
+			if e.Code == key.CodeGraveAccent {
+				return true
+			}
+			if e.Direction == key.DirPress || e.Direction == key.DirNone {
+				if b, err := shinyToAppleKeyboard(e); err != nil {
+					a2.Keypress(b)
+				}
+			}
+		}
+	default:
+	}
+
 	/*
 		select {
 		case _event := <-events:
