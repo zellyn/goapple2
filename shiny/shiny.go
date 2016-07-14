@@ -16,7 +16,6 @@ import (
 	"golang.org/x/mobile/event/key"
 	"golang.org/x/mobile/event/lifecycle"
 
-	"github.com/zellyn/go6502/cpu"
 	"github.com/zellyn/goapple2"
 	"github.com/zellyn/goapple2/cards"
 	"github.com/zellyn/goapple2/util"
@@ -38,10 +37,10 @@ const (
 
 // Run the emulator
 func RunEmulator(s screen.Screen) {
-	rom := util.ReadRomOrDie("../data/roms/apple2+.rom")
-	// charRom = util.ReadFullCharacterRomOrDie("../data/roms/apple2char.rom")
+	rom := util.ReadRomOrDie("../data/roms/apple2+.rom", 12288)
 	charRom := util.ReadSmallCharacterRomOrDie("../data/roms/apple2-chars.rom")
-	intBasicRom := util.ReadRomOrDie("../data/roms/apple2.rom")
+	intBasicRom := util.ReadRomOrDie("../data/roms/apple2.rom", 12288)
+	util.ReadRomOrDie("../data/roms/Apple Disk II 16 Sector Interface Card ROM P5 - 341-0027.bin", 256)
 
 	eventChan := make(chan (interface{}))
 	w, err := s.NewWindow(&screen.NewWindowOptions{Width: SCREEN_WIDTH, Height: SCREEN_HEIGHT})
@@ -129,9 +128,8 @@ func RunEmulator(s screen.Screen) {
 		a2.AddPCAction(
 			0xBDAF, goapple2.PCAction{Type: goapple2.ActionDumpMem, String: "0xBDAF-goa2.bin", Delay: 68})
 	*/
-	_ = cpu.FLAG_Z
 
-	// go typeProgram(a2)
+	go typeProgram(a2)
 
 	go func() {
 		for {
@@ -307,6 +305,8 @@ var KeyToApple = map[Key]byte{
 func shinyToAppleKeyboard(e key.Event) (byte, error) {
 	if b, ok := KeyToApple[Key{e.Code, e.Modifiers}]; ok {
 		return b, nil
+	} else {
+		fmt.Printf("Key for %v not found\n", e)
 	}
 	/*
 		switch k.Mod {
@@ -346,8 +346,10 @@ func ProcessEvents(a2 *goapple2.Apple2, w screen.Window, eventChan chan interfac
 				return true
 			}
 			if e.Direction == key.DirPress || e.Direction == key.DirNone {
-				if b, err := shinyToAppleKeyboard(e); err != nil {
+				if b, err := shinyToAppleKeyboard(e); err == nil {
 					a2.Keypress(b)
+				} else {
+					fmt.Printf("Unable to convert event %v (%d, %d): %v\n", e, int(e.Code), int(e.Modifiers), err)
 				}
 			}
 		}
@@ -410,7 +412,6 @@ func (s ShinyPlotter) OncePerFrame() {
 }
 
 func typeProgram(a2 *goapple2.Apple2) {
-	return
 	lines := []string{
 		"10 GR",
 		"20 POKE -16302,0",
