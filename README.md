@@ -2,6 +2,10 @@
 
 Apple ][+ emulator written in Go.
 
+## Install
+
+`go get -u github.com/zellyn/goapple2/{texty,shiny}`
+
 ## Status
 
 Basic functionality (keyboard input, text, low and hires graphics)
