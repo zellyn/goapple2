@@ -73,14 +73,14 @@ func RunEmulator(s screen.Screen) {
 	}
 
 	/*
-		diskCardRom := util.ReadRomOrDie("../data/roms/Apple Disk II 16 Sector Interface Card ROM P5 - 341-0027.bin")
+		diskCardRom := util.ReadRomOrDie("../data/roms/Apple Disk II 16 Sector Interface Card ROM P5 - 341-0027.bin", 256)
 		diskCard, err := cards.NewDiskCard(diskCardRom, 6, a2)
 		if err != nil {
 			panic(err)
 		}
-			if err := a2.AddCard(diskCard); err != nil {
-				log.Fatal(err)
-			}
+		if err := a2.AddCard(diskCard); err != nil {
+			log.Fatal(err)
+		}
 	*/
 	// disk1, err := disk.DiskFromFile("../data/disks/spedtest.dsk", 0)
 	// disk1, err := disk.DiskFromFile("../data/disks/dung_beetles.dsk", 0)
