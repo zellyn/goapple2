@@ -55,7 +55,16 @@ type Apple2 struct {
 	cycle           uint64
 }
 
-func NewApple2(p videoscan.Plotter, rom []byte, charRom [2048]byte) *Apple2 {
+// Option is an optional param to NewApple2.
+type Option func(*Apple2)
+
+func WithRAM(address uint16, bytes []byte) Option {
+	return func(a2 *Apple2) {
+		copy(a2.mem[address:], bytes)
+	}
+}
+
+func NewApple2(p videoscan.Plotter, rom []byte, charRom [2048]byte, options ...Option) *Apple2 {
 	a2 := &Apple2{
 		// BUG(zellyn): this is not how the apple2 keyboard actually works
 		keys:      make(chan byte, 16),
@@ -64,6 +73,11 @@ func NewApple2(p videoscan.Plotter, rom []byte, charRom [2048]byte) *Apple2 {
 	copy(a2.mem[len(a2.mem)-len(rom):len(a2.mem)], rom)
 	a2.scanner = videoscan.NewScanner(a2, p, charRom)
 	a2.cpu = cpu.NewCPU(a2, a2.Tick, cpu.VERSION_6502)
+
+	for _, o := range options {
+		o(a2)
+	}
+
 	a2.cpu.Reset()
 	return a2
 }
@@ -106,28 +120,28 @@ func (a2 *Apple2) handleC00X(address uint16, value byte, write bool) byte {
 		}
 		switch address {
 		case 0xC050: // GRAPHICS
-			fmt.Printf("$%04X: GRAPHICS\n", a2.cpu.PC())
+			// fmt.Printf("$%04X: GRAPHICS\n", a2.cpu.PC())
 			a2.scanner.SetGraphics(true)
 		case 0xC051: // TEXT
-			fmt.Printf("$%04X: NO GRAPHICS\n", a2.cpu.PC())
+			// fmt.Printf("$%04X: NO GRAPHICS\n", a2.cpu.PC())
 			a2.scanner.SetGraphics(false)
 		case 0xC052: // NOMIX
-			fmt.Printf("$%04X: NOMIX\n", a2.cpu.PC())
+			// fmt.Printf("$%04X: NOMIX\n", a2.cpu.PC())
 			a2.scanner.SetMix(false)
 		case 0xC053: // MIX
-			fmt.Printf("$%04X: MIX\n", a2.cpu.PC())
+			// fmt.Printf("$%04X: MIX\n", a2.cpu.PC())
 			a2.scanner.SetMix(true)
 		case 0xC054: // PAGE 1
-			fmt.Printf("$%04X: PAGE1\n", a2.cpu.PC())
+			// fmt.Printf("$%04X: PAGE1\n", a2.cpu.PC())
 			a2.scanner.SetPage(1)
 		case 0xC055: // PAGE 2
-			fmt.Printf("$%04X: PAGE2\n", a2.cpu.PC())
+			// fmt.Printf("$%04X: PAGE2\n", a2.cpu.PC())
 			a2.scanner.SetPage(2)
 		case 0xC056: // LORES
-			fmt.Printf("$%04X: LORES\n", a2.cpu.PC())
+			// fmt.Printf("$%04X: LORES\n", a2.cpu.PC())
 			a2.scanner.SetHires(false)
 		case 0xC057: // HIRES
-			fmt.Printf("$%04X: HIRES\n", a2.cpu.PC())
+			// fmt.Printf("$%04X: HIRES\n", a2.cpu.PC())
 			a2.scanner.SetHires(true)
 		}
 	}

@@ -2,7 +2,10 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/nsf/termbox-go"
@@ -14,14 +17,17 @@ import (
 // Mapping of screen bytes to character values
 var AppleChars = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ !\"#$%&'()*+,-./0123456789:;<=>?"
 
+var ColorFG = termbox.ColorGreen
+var ColorBG = termbox.ColorBlack
+
 // Translate to termbox
 func translateToTermbox(value byte) (char rune, fg, bg termbox.Attribute) {
 	// BUG(zellyn): change this to return char, MODE_ENUM.
 	ch := rune(AppleChars[value&0x3F])
 	if value&0x80 > 0 {
-		return ch, termbox.ColorGreen, termbox.ColorBlack
+		return ch, ColorFG, ColorBG
 	}
-	return ch, termbox.ColorGreen, termbox.ColorBlack + termbox.AttrReverse
+	return ch, ColorBG, ColorFG
 }
 
 func termboxToAppleKeyboard(ev termbox.Event) (key byte, err error) {
@@ -76,16 +82,32 @@ func (p TextPlotter) OncePerFrame() {
 }
 
 // Run the emulator
-func RunEmulator() {
-	rom := util.ReadRomOrDie("../data/roms/apple2+.rom")
+func RunEmulator(file string) error {
+	var options []goapple2.Option
+	if file != "" {
+		ColorFG = termbox.ColorDefault
+		ColorBG = termbox.ColorDefault
+		bytes, err := ioutil.ReadFile(file)
+		if err != nil {
+			return err
+		}
+		options = append(options, goapple2.WithRAM(0x6000, bytes))
+	}
+	rom := util.ReadRomOrDie("../data/roms/apple2+.rom", 12288)
 	charRom := util.ReadSmallCharacterRomOrDie("../data/roms/apple2-chars.rom")
 	plotter := TextPlotter(0)
-	a2 := goapple2.NewApple2(plotter, rom, charRom)
+	a2 := goapple2.NewApple2(plotter, rom, charRom, options...)
 	if err := termbox.Init(); err != nil {
-		panic(err)
+		return err
 	}
 	events := make(chan termbox.Event)
 	go func() {
+		if file != "" {
+			for _, ch := range "CALL 24576" {
+				a2.Keypress(byte(ch))
+			}
+			a2.Keypress(13)
+		}
 		for {
 			events <- termbox.PollEvent()
 		}
@@ -99,8 +121,15 @@ func RunEmulator() {
 		time.Sleep(1 * time.Nanosecond) // So the keyboard-reading goroutines can run
 	}
 	termbox.Close()
+	return nil
 }
 
+var binfile = flag.String("binfile", "", "binary file to load at $6000 and CALL")
+
 func main() {
-	RunEmulator()
+	flag.Parse()
+	if err := RunEmulator(*binfile); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
