@@ -21,14 +21,16 @@ const (
 	ActionSetLimit
 	ActionHere
 	ActionDiskStatus
+	ActionCallback
 )
 
 type PCAction struct {
-	Type   PCActionType
-	String string
-	Mask   byte
-	Masked byte
-	Delay  uint64
+	Type     PCActionType
+	String   string
+	Mask     byte
+	Masked   byte
+	Delay    uint64
+	Callback func()
 }
 
 // Apple II struct
@@ -289,6 +291,8 @@ func (a2 *Apple2) Step() error {
 			case ActionDiskStatus:
 				fmt.Printf("$%04X: %v\n",
 					a2.cpu.PC(), a2.cards[6])
+			case ActionCallback:
+				action.Callback()
 			}
 		}
 	}
