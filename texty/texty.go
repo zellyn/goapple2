@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"time"
+	"strings"
 
 	"github.com/nsf/termbox-go"
 	"github.com/zellyn/goapple2"
@@ -81,7 +81,10 @@ func (p TextPlotter) OncePerFrame() {
 	termbox.Flush()
 }
 
-// Run the emulator
+// Run the emulator. If file is not empty, load it at address 0x6000,
+// add a PCAction to quit if address 0 is called, clear the screen,
+// call 0x6000, call 0, and dump the screen contents (minus trailing
+// whitespace).
 func RunEmulator(file string) error {
 	var options []goapple2.Option
 	if file != "" {
@@ -94,16 +97,24 @@ func RunEmulator(file string) error {
 		options = append(options, goapple2.WithRAM(0x6000, bytes))
 	}
 	rom := util.ReadRomOrDie("../data/roms/apple2+.rom", 12288)
-	charRom := util.ReadSmallCharacterRomOrDie("../data/roms/apple2-chars.rom")
+	var charRom [2048]byte
 	plotter := TextPlotter(0)
 	a2 := goapple2.NewApple2(plotter, rom, charRom, options...)
 	if err := termbox.Init(); err != nil {
 		return err
 	}
 	events := make(chan termbox.Event)
+	done := false
+
+	if file != "" {
+		a2.AddPCAction(0, goapple2.PCAction{
+			Type:     goapple2.ActionCallback,
+			Callback: func() { done = true },
+		})
+	}
 	go func() {
 		if file != "" {
-			for _, ch := range "CALL 24576" {
+			for _, ch := range "HOME:CALL 24576:CALL 0" {
 				a2.Keypress(byte(ch))
 			}
 			a2.Keypress(13)
@@ -112,16 +123,34 @@ func RunEmulator(file string) error {
 			events <- termbox.PollEvent()
 		}
 	}()
-	for !ProcessEvents(events, a2) {
+	for !ProcessEvents(events, a2) && !done {
 		err := a2.Step()
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
-		time.Sleep(1 * time.Nanosecond) // So the keyboard-reading goroutines can run
 	}
 	termbox.Close()
+	if file != "" {
+		dumpscreen(a2)
+	}
 	return nil
+}
+
+func dumpscreen(a2 *goapple2.Apple2) {
+	chars := []byte{}
+	for third := 0x400; third <= 0x450; third += 0x28 {
+		for base := third; base <= third+0x380; base += 0x80 {
+			for x := 0; x < 40; x++ {
+				ch := a2.RamRead(uint16(base + x))
+				chars = append(chars, ch&0x7f)
+			}
+			chars = append(chars, '\n')
+		}
+	}
+	screen := string(chars)
+	screen = strings.TrimRight(screen, "\r\n\t ")
+	fmt.Println(screen)
 }
 
 var binfile = flag.String("binfile", "", "binary file to load at $6000 and CALL")
