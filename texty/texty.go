@@ -85,7 +85,7 @@ func (p TextPlotter) OncePerFrame() {
 // add a PCAction to quit if address 0 is called, clear the screen,
 // call 0x6000, call 0, and dump the screen contents (minus trailing
 // whitespace).
-func RunEmulator(file string) error {
+func RunEmulator(file string, quit bool) error {
 	var options []goapple2.Option
 	if file != "" {
 		ColorFG = termbox.ColorDefault
@@ -97,7 +97,7 @@ func RunEmulator(file string) error {
 		options = append(options, goapple2.WithRAM(0x6000, bytes))
 	}
 	rom := util.ReadRomOrDie("../data/roms/apple2+.rom", 12288)
-	var charRom [2048]byte
+	charRom := util.ReadSmallCharacterRomOrDie("../data/roms/apple2-chars.rom")
 	plotter := TextPlotter(0)
 	a2 := goapple2.NewApple2(plotter, rom, charRom, options...)
 	if err := termbox.Init(); err != nil {
@@ -114,8 +114,13 @@ func RunEmulator(file string) error {
 	}
 	go func() {
 		if file != "" {
-			for _, ch := range "HOME:CALL 24576:CALL 0" {
+			for _, ch := range "HOME:CALL 24576" {
 				a2.Keypress(byte(ch))
+			}
+			if quit {
+				for _, ch := range ":CALL 0" {
+					a2.Keypress(byte(ch))
+				}
 			}
 			a2.Keypress(13)
 		}
@@ -154,10 +159,11 @@ func dumpscreen(a2 *goapple2.Apple2) {
 }
 
 var binfile = flag.String("binfile", "", "binary file to load at $6000 and CALL")
+var quit = flag.Bool("quit", false, "quit after running binary")
 
 func main() {
 	flag.Parse()
-	if err := RunEmulator(*binfile); err != nil {
+	if err := RunEmulator(*binfile, *quit); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
