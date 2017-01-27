@@ -226,7 +226,7 @@ F8D0: 20 82 F8  225  INSTDSP  JSR   INSDS1     ;GEN FMT, LEN BYTES
 F8D3: 48        226           PHA              ;SAVE MNEMONIC TABLE INDEX
 F8D4: B1 3A     227  PRNTOP   LDA   (PCL),Y
 F8D6: 20 DA FD  228           JSR   PRBYTE
-F8D9: A2 01     229           LDX   #$01       ;PRINT 2 BLANKS
+F8D9: A2 01     229           LDX   #$01       ;PRINT 2 BLANKS {ACTUALLY JUST 1}
 F8DB: 20 4A F9  230  PRNTBL   JSR   PRBL2
 F8DE: C4 2F     231           CPY   LENGTH     ;PRINT INST (1-3 BYTES)
 F8E0: C8        232           INY              ;IN A 12 CHR FIELD
