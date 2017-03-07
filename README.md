@@ -8,6 +8,8 @@ Apple ][+ emulator written in Go.
 
 ## Status
 
+[![No Maintenance Intended](http://unmaintained.tech/badge.svg)](http://unmaintained.tech/)
+
 Basic functionality (keyboard input, text, low and hires graphics)
 works.
 
