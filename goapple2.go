@@ -95,6 +95,7 @@ func (a2 *Apple2) AddCard(card cards.Card) error {
 		a2.cardTickerMask |= slotbit
 	}
 	a2.cards[slot] = card
+	card.Init()
 	return nil
 }
 
@@ -213,7 +214,7 @@ func (a2 *Apple2) Read(address uint16) byte {
 	if address&0xF000 == 0xC000 {
 		return a2.handleC00X(address, 0, false)
 	}
-	if address >= 0xD000 && a2.cardRomMask > 0 {
+	if address >= 0xD000 && a2.card12kMask > 0 {
 		if a2.card12kConflict {
 			panic(fmt.Sprintf("More than one card trying to provide 12K ROM: Mask=$%02X", a2.card12kMask))
 		}
@@ -235,7 +236,7 @@ func (a2 *Apple2) Write(address uint16, value byte) {
 	// 	fmt.Printf("Write to 0x46: PC==$%04X\n", a2.cpu.PC())
 	// }
 	if address >= 0xD000 {
-		if a2.cardRomMask > 0 {
+		if a2.card12kMask > 0 {
 			if a2.card12kConflict {
 				panic(fmt.Sprintf("More than one card trying to provide 12K ROM: Mask=$%02X", a2.card12kMask))
 			}
@@ -344,9 +345,9 @@ func (a2 *Apple2) HandleROM(onOff bool, slot byte) {
 
 func (a2 *Apple2) Handle12k(onOff bool, slot byte) {
 	if onOff {
-		a2.card12kMask |= slot
+		a2.card12kMask |= (1 << slot)
 	} else {
-		a2.card12kMask &^= slot
+		a2.card12kMask &^= (1 << slot)
 	}
 	a2.card12kConflict = a2.card12kMask&(a2.card12kMask-1) > 0
 	if !onOff && !a2.card12kConflict && a2.card12kMask > 0 {

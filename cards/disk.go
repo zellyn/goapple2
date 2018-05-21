@@ -58,6 +58,9 @@ func (dc *DiskCard) String() string {
 
 }
 
+func (dc *DiskCard) Init() {
+}
+
 func (dc *DiskCard) Slot() byte {
 	return dc.slot
 }

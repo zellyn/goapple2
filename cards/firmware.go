@@ -5,24 +5,26 @@ import (
 )
 
 type FirmwareCard struct {
-	name    string
-	rom     [12288]byte
-	cm      CardManager
-	slot    byte
-	slotbit byte
+	name string
+	rom  [12288]byte
+	cm   CardManager
+	slot byte
 }
 
 func NewFirmwareCard(rom []byte, name string, slot byte, cm CardManager) (*FirmwareCard, error) {
 	if len(rom) != 12288 {
 		return nil, fmt.Errorf("Wrong size ROM: expected 12288, got %d", len(rom))
 	}
-	fc := &FirmwareCard{name: name, cm: cm, slot: slot, slotbit: 1 << slot}
+	fc := &FirmwareCard{name: name, cm: cm, slot: slot}
 	copy(fc.rom[:], rom)
 	return fc, nil
 }
 
 func (fc *FirmwareCard) String() string {
 	return fmt.Sprintf("%s (slot %d)", fc.name, fc.slot)
+}
+
+func (fc *FirmwareCard) Init() {
 }
 
 func (fc *FirmwareCard) Slot() byte {
@@ -36,10 +38,10 @@ func (fc *FirmwareCard) ROMDisabled() {
 func (fc *FirmwareCard) handleAccess(address byte) {
 	if address%2 == 1 {
 		// Card off
-		fc.cm.HandleROM(false, fc.slotbit)
+		fc.cm.HandleROM(false, fc.slot)
 	} else {
 		// Card on
-		fc.cm.HandleROM(true, fc.slotbit)
+		fc.cm.HandleROM(true, fc.slot)
 	}
 }
 

@@ -1,6 +1,7 @@
 package cards
 
 type Card interface {
+	Init()                             // Give the card a chance to initialize
 	String() string                    // The name of the card, for debug/display purposes
 	Read16(address byte) byte          // Read from the $C0(8+slot)X addresses
 	Write16(address byte, value byte)  // Write to the $C0(8+slot)X addresses

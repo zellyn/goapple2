@@ -8,7 +8,6 @@ import (
 	"image/color"
 	"log"
 	"os"
-	"runtime"
 	"runtime/pprof"
 
 	"golang.org/x/exp/shiny/driver"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/zellyn/goapple2"
 	"github.com/zellyn/goapple2/cards"
+	"github.com/zellyn/goapple2/disk"
 	"github.com/zellyn/goapple2/util"
 	"github.com/zellyn/goapple2/videoscan"
 )
@@ -39,17 +39,17 @@ const (
 func RunEmulator(s screen.Screen) {
 	rom := util.ReadRomOrDie("../data/roms/apple2+.rom", 12288)
 	charRom := util.ReadSmallCharacterRomOrDie("../data/roms/apple2-chars.rom")
-	intBasicRom := util.ReadRomOrDie("../data/roms/apple2.rom", 12288)
+	// intBasicRom := util.ReadRomOrDie("../data/roms/apple2.rom", 12288)
 	util.ReadRomOrDie("../data/roms/Apple Disk II 16 Sector Interface Card ROM P5 - 341-0027.bin", 256)
 
 	eventChan := make(chan (interface{}))
-	w, err := s.NewWindow(&screen.NewWindowOptions{Width: SCREEN_WIDTH, Height: SCREEN_HEIGHT})
+	w, err := s.NewWindow(&screen.NewWindowOptions{Width: SCREEN_WIDTH * 2, Height: SCREEN_HEIGHT * 2})
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer w.Release()
 
-	winSize := image.Point{SCREEN_WIDTH, SCREEN_HEIGHT}
+	winSize := image.Point{SCREEN_WIDTH * 2, SCREEN_HEIGHT * 2}
 	b, err := s.NewBuffer(winSize)
 	if err != nil {
 		log.Fatal(err)
@@ -59,37 +59,48 @@ func RunEmulator(s screen.Screen) {
 	var a2 *goapple2.Apple2
 	oncePerFrame := func() {
 		a2.Done = a2.Done || ProcessEvents(a2, w, eventChan)
-		runtime.Gosched()
 	}
 	plotter := ShinyPlotter{w, b, oncePerFrame}
 	a2 = goapple2.NewApple2(plotter, rom, charRom)
 
-	firmwareCard, err := cards.NewFirmwareCard(intBasicRom, "Intbasic Firmware Card", 0, a2)
-	if err != nil {
-		panic(err)
-	}
-	if err := a2.AddCard(firmwareCard); err != nil {
-		log.Fatal(err)
-	}
-
 	/*
-		diskCardRom := util.ReadRomOrDie("../data/roms/Apple Disk II 16 Sector Interface Card ROM P5 - 341-0027.bin", 256)
-		diskCard, err := cards.NewDiskCard(diskCardRom, 6, a2)
+		firmwareCard, err := cards.NewFirmwareCard(intBasicRom, "Intbasic Firmware Card", 0, a2)
 		if err != nil {
 			panic(err)
 		}
-		if err := a2.AddCard(diskCard); err != nil {
+		if err := a2.AddCard(firmwareCard); err != nil {
 			log.Fatal(err)
 		}
 	*/
+
+	languageCard, err := cards.NewLanguageCard(rom, "Language Card", 0, a2)
+	if err != nil {
+		panic(err)
+	}
+	if err := a2.AddCard(languageCard); err != nil {
+		log.Fatal(err)
+	}
+
+	diskCardRom := util.ReadRomOrDie("../data/roms/Apple Disk II 16 Sector Interface Card ROM P5 - 341-0027.bin", 256)
+	diskCard, err := cards.NewDiskCard(diskCardRom, 6, a2)
+	if err != nil {
+		panic(err)
+	}
+	if err := a2.AddCard(diskCard); err != nil {
+		log.Fatal(err)
+	}
 	// disk1, err := disk.DiskFromFile("../data/disks/spedtest.dsk", 0)
 	// disk1, err := disk.DiskFromFile("../data/disks/dung_beetles.dsk", 0)
 	// disk1, err := disk.DiskFromFile("../data/disks/chivalry.dsk", 0)
 	// disk1, err := disk.DiskFromFile("../data/disks/wavynavy.dsk", 0)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// diskCard.LoadDisk(disk1, 0)
+	disk1, err := disk.DiskFromFile("/Users/zellyn/Documents/a2-disks/disks/Rescue_Raiders_1.2.dsk", 0)
+	// disk1, err := disk.DiskFromFile("/Users/zellyn/Development/go/src/github.com/zellyn/a2audit/floatbus/floatbus.dsk", 0)
+	// disk1, err := disk.DiskFromFile("/Users/zellyn/Development/go/src/github.com/zellyn/a2audit/audit/audit.dsk", 0)
+	// disk1, err := disk.DiskFromFile("/Users/zellyn/Development/go/src/github.com/zellyn/diskii/lib/supermon/testdata/chacha20.dsk", 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+	diskCard.LoadDisk(disk1, 0)
 
 	steps := *steplimit
 
@@ -119,7 +130,7 @@ func RunEmulator(s screen.Screen) {
 
 		a2.AddPCAction(0xBDAF, goapple2.PCAction{Type: goapple2.ActionDiskStatus})
 
-		a2.AddPCAction(0xBDAF, goapple2.PCAction{Type: goapple2.ActionTrace, String: "on",
+		a2.AddPCAction(0x6000, goapple2.PCAction{Type: goapple2.ActionTrace, String: "on",
 			Delay: 70})
 
 		a2.AddPCAction(
@@ -129,7 +140,9 @@ func RunEmulator(s screen.Screen) {
 			0xBDAF, goapple2.PCAction{Type: goapple2.ActionDumpMem, String: "0xBDAF-goa2.bin", Delay: 68})
 	*/
 
-	go typeProgram(a2)
+	// a2.AddPCAction(0x6000, goapple2.PCAction{Type: goapple2.ActionTrace, String: "on"})
+
+	// go typeProgram(a2)
 
 	go func() {
 		for {
@@ -143,7 +156,6 @@ func RunEmulator(s screen.Screen) {
 			fmt.Println(err)
 			break
 		}
-		// runtime.Gosched() // So the keyboard-reading goroutines can run
 		if steps > 0 {
 			steps--
 			if steps == 0 {
@@ -156,7 +168,12 @@ func RunEmulator(s screen.Screen) {
 
 func plot(x, y int, c color.RGBA, b screen.Buffer) {
 	rgba := b.RGBA()
-	rgba.SetRGBA(x+BORDER_W, y+BORDER_H, c)
+	xx := (x + BORDER_W) * 2
+	yy := (y + BORDER_H) * 2
+	rgba.SetRGBA(xx, yy, c)
+	rgba.SetRGBA(xx+1, yy, c)
+	rgba.SetRGBA(xx, yy+1, c)
+	rgba.SetRGBA(xx+1, yy+1, c)
 
 	/*
 		x = x + BORDER_W
