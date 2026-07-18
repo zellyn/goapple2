@@ -6,7 +6,7 @@ require (
 	github.com/gonuts/commander v0.4.1
 	github.com/gonuts/flag v0.1.0
 	github.com/nsf/termbox-go v1.1.1
-	github.com/zellyn/go6502 v0.0.0-20180903215534-3f33ff425752
+	github.com/zellyn/go6502 v0.0.0-20260718001940-fd7649dc77b5
 	golang.org/x/exp/shiny v0.0.0-20250506013437-ce4c2cf36ca6
 	golang.org/x/mobile v0.0.0-20250506005352-78cd7a343bde
 )

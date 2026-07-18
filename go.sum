@@ -27,8 +27,8 @@ github.com/posener/complete v1.2.3/go.mod h1:WZIdtGGp+qx0sLrYKtIRAruyNpv6hFCicSg
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJyk=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
-github.com/zellyn/go6502 v0.0.0-20180903215534-3f33ff425752 h1:cjmVh1uIu0hGg5etn0nJWN+TOQEyC8kn3Aa3S26vJdU=
-github.com/zellyn/go6502 v0.0.0-20180903215534-3f33ff425752/go.mod h1:20G3fLkz19U8aXPAIk1NTzq685GI94UY7Os1tXu1Rxo=
+github.com/zellyn/go6502 v0.0.0-20260718001940-fd7649dc77b5 h1:tf9Kk0yKLMGWh7wz90ya9Ht5U5rxhfWAf/fk29seUSE=
+github.com/zellyn/go6502 v0.0.0-20260718001940-fd7649dc77b5/go.mod h1:ZmI1dBBcL75bpqEtsLstsVESIMoA8K44Wr8IHPMY5Sg=
 golang.org/x/exp/shiny v0.0.0-20250506013437-ce4c2cf36ca6 h1:OKqTTvTtXrxCm19HtttLTgySk+NUt9mcsKAq827Ltz4=
 golang.org/x/exp/shiny v0.0.0-20250506013437-ce4c2cf36ca6/go.mod h1:ygj7T6vSGhhm/9yTpOQQNvuAUFziTH7RUiH74EoE2C8=
 golang.org/x/image v0.27.0 h1:C8gA4oWU/tKkdCfYT6T2u4faJu3MeNS5O8UPWlPF61w=
