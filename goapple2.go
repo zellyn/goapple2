@@ -55,6 +55,13 @@ type Apple2 struct {
 	pcActions       map[uint16][]*PCAction
 	limit           int
 	cycle           uint64
+	cycles          uint64 // count of CPU cycles (Tick calls), for timing
+}
+
+// Cycles returns the number of CPU cycles executed (one per Tick), i.e. a
+// cycle-accurate clock. On a 1 MHz Apple II this advances ~1.02e6 per second.
+func (a2 *Apple2) Cycles() uint64 {
+	return a2.cycles
 }
 
 // Option is an optional param to NewApple2.
@@ -310,6 +317,7 @@ func (a2 *Apple2) Step() error {
 }
 
 func (a2 *Apple2) Tick() {
+	a2.cycles++
 	a2.scanner.Scan1()
 	tickerMask := a2.cardTickerMask
 	for i := 0; i < 8 && tickerMask > 0; i++ {
