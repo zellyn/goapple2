@@ -197,6 +197,90 @@ func (s *Scanner) address() uint16 {
 	return addr
 }
 
+// scanAddress is the pure closed-form video-beam address for a given horizontal
+// (h) and vertical (v) counter value and the current soft-switch state. It
+// depends on h and v only through the same combinational logic the hardware
+// uses, so it needs no per-cycle scanner state: hbl and lastFour, which inc()
+// otherwise maintains incrementally, are recomputed here from h and v and are
+// bit-identical to the incrementally-maintained values.
+func scanAddress(h, v uint16, graphics, mix, hires, page2 bool) uint16 {
+	// HBL = H5' & (H3' + H4')
+	hbl := ((h >> 3) & 7) <= 2
+	// Last four lines of the screen?
+	lastFour := (v>>5)&5 == 5
+
+	// Low three bits are just H0-H2
+	addr := h & 7
+
+	// Next four bits are H5,H4,H3 + offset = SUM-A6,SUM-A5,SUM-A4,SUM-A3
+	addr |= SUMS[(h>>3)&7+(v>>3)&24]
+
+	// Next three are V0,V1,V2
+	addr |= (v << 4) & 0x380 // ((v >> 3 & 7) << 7)
+
+	page := uint16(1)
+	if page2 {
+		page = 2
+	}
+
+	// HIRES TIME when HIRES,GRAPHICS,NOMIX or HIRES,GRAPHICS,MIX,!(V4&V2)
+	hiresTime := hires && graphics
+	if hiresTime && mix && lastFour {
+		hiresTime = false
+	}
+
+	if hiresTime {
+		// A10-A12 = VA-VC
+		addr |= ((v & 7) << 10)
+		// A13=PAGE1, A14=PAGE2
+		addr |= page << 13
+	} else {
+		// A10=PAGE1, A11=PAGE2
+		addr |= page << 10
+		// A12 = HBL
+		if hbl {
+			addr |= (1 << 12)
+		}
+	}
+
+	return addr
+}
+
+// beamPosition returns the (h, v) counter values the scanner holds when it
+// performs the scan for CPU cycle number `cycles` (the 1-based Tick counter).
+//
+// The scanner is constructed at "state_1" (h=0, v=250) and advances one inc()
+// per Tick, so the scan for Tick k uses "state_k". The horizontal counter runs
+// 65 values per scan line (0, then 0x40..0x7F) and the vertical counter runs
+// 262 lines per frame (250..511, i.e. 0x1FF, then wrapping back to 250). Both
+// are periodic, so state_k is closed-form in k with no per-cycle walk.
+func beamPosition(cycles uint64) (h, v uint16) {
+	n := cycles - 1 // steps beyond state_1
+	p := n % 65     // position within the 65-cycle scan line
+	if p == 0 {
+		h = 0
+	} else {
+		h = 0x3f + uint16(p) // p=1..64 -> h=0x40..0x7F
+	}
+	line := (n / 65) % 262 // line within the 262-line frame
+	v = 250 + uint16(line)
+	return h, v
+}
+
+// FloatingBusByte returns the raw byte the video scanner latches onto the data
+// bus at CPU cycle `cycles` (the 1-based Tick counter), using the current
+// soft-switch state. It reproduces exactly the value that a per-cycle Scan1
+// would have left in the machine's "last byte read" latch (the floating bus),
+// but computes the beam position closed-form so it costs nothing per cycle: the
+// headless path calls it only when the CPU actually reads the floating bus.
+func (s *Scanner) FloatingBusByte(cycles uint64) byte {
+	if cycles == 0 {
+		return 0
+	}
+	h, v := beamPosition(cycles)
+	return s.m.RamRead(scanAddress(h, v, s.graphics, s.mix, s.hires, s.page2))
+}
+
 func (s *Scanner) SetGraphics(graphics bool) {
 	s.graphics = graphics
 	if graphics {

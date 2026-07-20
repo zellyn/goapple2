@@ -56,6 +56,7 @@ type Apple2 struct {
 	limit           int
 	cycle           uint64
 	cycles          uint64 // count of CPU cycles (Tick calls), for timing
+	lazyVideo       bool   // headless: skip per-cycle scan, compute floating bus on demand
 }
 
 // Cycles returns the number of CPU cycles executed (one per Tick), i.e. a
@@ -70,6 +71,19 @@ type Option func(*Apple2)
 func WithRAM(address uint16, bytes []byte) Option {
 	return func(a2 *Apple2) {
 		copy(a2.mem[address:], bytes)
+	}
+}
+
+// WithLazyVideoScan puts the machine in headless (no-rendering) mode: instead of
+// running the video scanner every CPU cycle to feed a real Plotter and keep the
+// floating-bus latch current, it skips the per-cycle scan entirely and computes
+// the floating-bus byte on demand (closed-form from the cycle counter) only when
+// the CPU actually reads it. Behavior is identical for any program — including
+// one that reads the floating bus — but there is no per-cycle scan cost. Use it
+// only with a no-op Plotter (nothing is drawn); the default machine is unchanged.
+func WithLazyVideoScan() Option {
+	return func(a2 *Apple2) {
+		a2.lazyVideo = true
 	}
 }
 
@@ -212,8 +226,16 @@ func (a2 *Apple2) handleC00X(address uint16, value byte, write bool) byte {
 	return a2.cards[a2.cardRomHandler].Read(address)
 }
 
-// EmptyRead returns the value last read from RAM, lingering on the bus.
+// EmptyRead returns the value lingering on the data bus for an address backed by
+// no RAM/ROM/card (the "floating bus"). While rendering, the per-cycle scanner
+// keeps a2.lastRead current with the byte the video circuitry is fetching, so
+// that is returned. In headless (lazy-video) mode the per-cycle scan is skipped,
+// so the same byte is instead computed on demand from the current cycle count —
+// bit-identical to what the per-cycle scan would have latched.
 func (a2 *Apple2) EmptyRead() byte {
+	if a2.lazyVideo {
+		return a2.scanner.FloatingBusByte(a2.cycles)
+	}
 	return a2.lastRead
 }
 
@@ -318,7 +340,12 @@ func (a2 *Apple2) Step() error {
 
 func (a2 *Apple2) Tick() {
 	a2.cycles++
-	a2.scanner.Scan1()
+	// Headless: skip the per-cycle video scan; the floating bus is computed on
+	// demand in EmptyRead. Rendering machines still scan every cycle so the
+	// Plotter sees every byte and the floating-bus latch stays current.
+	if !a2.lazyVideo {
+		a2.scanner.Scan1()
+	}
 	tickerMask := a2.cardTickerMask
 	for i := 0; i < 8 && tickerMask > 0; i++ {
 		if tickerMask&1 == 1 {
